@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Anim Test</title>
+
+    <script src="script.js"></script>
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <anims>
+        <anim id="my_anim" type="leave">
+            <trigger name="none"></trigger>
+            <call name="anims-1"></call>
+        </anim>
+        <anim id="my_anim2" type="leave">
+            <trigger name="none"></trigger>
+            <call name="anims-1"></call>
+        </anim>
+    </anims>
+</head>
+<body>
+    <div id="div-container" data-useanims="my_anim">This is amazing !!</div>
+    <script>
+        enable_debug();
+    </script>
+</body>
+</html>
