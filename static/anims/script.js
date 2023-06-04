@@ -1,4 +1,56 @@
 
+
+// ANIMATIONS
+
+animations_map = {};
+
+class Animation{
+    type = "";
+    id = "";
+
+    execute(nodes, options){
+    }
+
+    setup() {animations_map[this.id] = this;}
+}
+
+class CSSAnimation extends Animation{
+    css = [];
+    execute(nodes, options){
+        nodes.forEach((node)=>{
+            node.animate(this.css, {duration: 3000, iterations: Infinity});
+        })
+    }
+
+}
+
+class ProceduralAnimation extends Animation{
+    _current_step = 0;
+
+    // TO OVERRIDE
+    duration(nodes, options){var {duration = 2000} = options; return duration;}
+    steps(nodes, options) {return 0;}
+    execute(nodes, options){
+        duration = this.duration();
+        steps = this.steps();
+        step_time = duration / steps;
+        window.setInterval(() => {this.execute_step(_current_step++, steps, nodes, options)}, step_time);
+    }
+    // TO OVERRIDE
+    execute_step(step, step_count, nodes, options){}
+
+}
+
+class WaveEmphasisAnimation extends CSSAnimation {
+    type = "emphasis";
+    id = "wave-emphasis";
+
+    css = [
+        {transform: "scale(0.9)"},
+        {transform: "scale(1)"}]
+}
+// ----------------------------------------------------------------
+
 customElements.define("extendable-box",
   class extends HTMLElement {
     constructor(){
@@ -53,12 +105,10 @@ class AnimCall {
     constructor(node) {
         this.node = node;
         this.anim = node.getAttribute("name");
-        switch(this.anim) {
-            case "anim-1":
-                break;
-            case "anim-2":
-                break;
-        }
+    }
+
+    execute(node) {
+
     }
 }
 
@@ -79,7 +129,11 @@ class AnimationProcessor {
     loaded = false;
 
     play_animation(anim_id) {
-        console.log(anim_id);
+        this.animations.forEach(anim => {
+            if (anim.id == anim_id) {
+                anim.execute(document.querySelectorAll("*[data-useanims*='" + anim.id + "']"));
+            }
+        })
     }
 
     pause_animation(anim_id) {
@@ -182,10 +236,10 @@ class AnimationImage {
         this.calls = calls;
 
     }
-    execute(){
+    execute(node_list){
         this.calls.forEach(call => {
-
-        });
+            call.execute(node_list);
+        })
     }
 }
 
