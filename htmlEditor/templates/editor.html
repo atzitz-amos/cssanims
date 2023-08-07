@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor</title>
+    <link rel="stylesheet" href="editor.css">
+    <script src="editor.js"></script>
+</head>
+<body>
+    <span class="sizer" style="opacity: 0; position: absolute;"></span>
+    <div class="header"></div>
+    <div class="content">
+        <div class="editor">
+            <div class="tree" hidden>
+                <div class="tree-node tree-root">
+                    <div class="tree-node-title">Project</div>
+                    <div class="tree-node-content">
+                        <div class="tree-node"><div class="tree-node-title">Dir1</div><div class="tree-node-content"><div class="tree-file">File2</div></div></div>
+                        <div class="tree-file" data-path="dir1/file1.html" data-language="html">File1</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-open" role="button">Files</div>
+            <div class="filescontent">
+                <div class="tabmanager">
+                    <div class="tabheader" data-linkedto="tab-0" data-language="html" selected>file1.html</div>
+                    <div class="tabheader" data-linkedto="tab-1" data-language="html">file2.html</div>
+                </div>
+                <div class="tabcontent">
+                    <div class="tab-lines"><div class="tab-line-number">1</div></div>
+                    <div class="tab-editor">
+                        <div class="editor-layer editor-inner">
+                            <div class="line current-line" id="line-1"></div>
+                        </div>
+                        <div class="editor-layer editor-cursors">
+                            <div class="tab-editor-cursor"></div>
+                            <input class="editor-input" style="position: absolute;">
+                        </div>
+                        <div class="editor-layer editor-selection"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="preview" style="background:white"></div>
+    </div>
+    <div class="footer"></div>
+</body>
+</html>
