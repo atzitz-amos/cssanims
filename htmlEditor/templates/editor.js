@@ -1,4 +1,8 @@
 
+// CONSTANTS
+
+const BLOCK_CTRL_MOVEMENT = [":", ".", ";", ",", "(", ")", "[", "]", "{", "}", " "];
+
 // DYNAMIC SIZING
 
 function updateDynamicSizing() {
@@ -25,22 +29,6 @@ size = {
 
 function switchAttr(el, attr) {el.hasAttribute(attr) ? el.removeAttribute(attr) : el.setAttribute(attr, "");}
 
-clickRegister = {
-    lastClickTimestamp: null,
-    isClicked: false,
-    register: function () {
-        this.isClicked = true;
-        this.lastClickTimestamp = (new Date()).getTime();
-    },
-    release: function () {
-        this.isClicked = false;
-        this.lastClickTimestamp = null;
-    },
-    sinceClick: function () {
-        return (new Date()).getTime() - this.lastClickTimestamp;
-    }
-}
-
 // END UTILS
 
 window.onload = () => {
@@ -66,28 +54,35 @@ window.onload = () => {
         if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'End', 'Home'].includes(e.code)) {
             if(e.shiftKey) selection.setActive(true);
             else if (selection.selectionActive){
-                selection.cancel();
-                if (['ArrowLeft', 'ArrowRight'].includes(e.code)) return;
+                if (e.code == "ArrowLeft") {
+                    if (selection.direction() == 1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
+                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
+                }
+                else if (e.code == "ArrowRight") {
+                    if (selection.direction() == -1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
+                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
+                }
+                return selection.cancel();
             }
         }
         switch (e.key) {
             case "Backspace":
-                writer.deletePrevChar();
+                writer.deletePrevChar(e.ctrlKey);
                 break;
             case "Enter":
                 writer.writeLine();
                 break;
             case "ArrowLeft":
-                writer.moveCursorHoriz(-1);
+                writer.moveCursorHoriz(-1, e.ctrlKey);
                 break;
             case "ArrowRight":
-                writer.moveCursorHoriz(1);
+                writer.moveCursorHoriz(1, e.ctrlKey);
                 break;
             case "ArrowUp":
-                writer.moveCursorVert(-1);
+                writer.moveCursorVert(-1, e.ctrlKey);
                 break;
             case "ArrowDown":
-                writer.moveCursorVert(1);
+                writer.moveCursorVert(1, e.ctrlKey);
                 break;
             case "Tab":
                 writer.writeText("\t")
@@ -98,6 +93,10 @@ window.onload = () => {
                 break;
             case "End":
                 cursor.setText(writer.lines[writer.currentline-1].text());
+                break;
+            case "Delete":
+                writer.deleteNextChar(e.ctrlKey);
+                break;
         }
     });  // keys
 
@@ -111,11 +110,7 @@ window.onload = () => {
         var x = e.x - rect.x; var y = e.y - rect.y;
         const line = Math.ceil(y / 20);
         writer.moveCursorTo(x, line);
-
-        clickRegister.register();
     });  // click down
-
-    document.querySelector(".tab-editor").addEventListener("mouseup", (e) => {clickRegister.release();}) // click up
 
     document.querySelector(".tab-editor").addEventListener("mousemove", e => {
         if(e.buttons == 1){
@@ -135,6 +130,7 @@ class Line {
         this.number = number;
         this.element = element;
         this.current = current;
+        this.visible = true;
     }
     write(text, pos){
         var inner = this.element.textContent;
@@ -236,18 +232,10 @@ cursor = {
         this.textPos = textB.length;
     },
     moveApproxX: function (approxX, text) {
-        var minDistance = null;
-        var bestWidth = 0;
-        for (var i=0; i<text.length+1; i++) {
-            let width = this.getWidth(text.substring(0, i));
-            if(minDistance < 0) break;
-            if (minDistance == null || approxX - width < minDistance) {
-                minDistance = approxX - width;
-                bestWidth = width;
-            }
-        }
-        this.textPos = i-1;
-        this.setPos(bestWidth, this.y);
+        var x = Math.round(approxX / this.getWidth("a"));
+        if (x > text.length) {x = text.length;}
+        this.textPos = x;
+        this.setPos(x * this.getWidth("a"), this.y);
     },
     resetBlink: function () {
         this.cursor().removeAttribute("hidden");
@@ -256,6 +244,18 @@ cursor = {
     },
     setVertMovementPos(newPos){
         this.vertMovementPos = Math.max(this.vertMovementPos, newPos);
+    },
+    getCtrlMovementNewPos: function (text, direction) {
+        i = this.textPos;
+        while (!BLOCK_CTRL_MOVEMENT.includes(text.charAt(i))) {
+            if (i == this.textPos){}
+            if (direction == 1 && i == text.length || direction == -1 && i == 0) {
+                return i;
+            }
+            i += direction;
+        }
+        while (text.charAt(i) == text.charAt(i + direction)) i += direction;
+        return direction == 1 ? i : i + 1;
     }
 }
 
@@ -268,7 +268,6 @@ writer = {
     writeText: function (text) {
         if (selection.selectionActive) {
             this.deleteSelectionContent();
-            selection.cancel();
         }
         cursor.setText(this.lines[this.currentline - 1].write(text, cursor.textPos));
     },
@@ -303,7 +302,8 @@ writer = {
         else {Line.updateLineNumbersUp(index, this.lines, lineN);}
         this.lines.splice(index-1, 0, new Line(this.currentline, line, true));
     },
-    deletePrevChar: function () {
+    deletePrevChar: function (ctrlDown=false) {
+        if (selection.selectionActive) return this.deleteSelectionContent();
         if(this.lines[this.currentline - 1].empty()) return this.deleteLine();
         else if(cursor.textPos == 0){
             if(this.currentline == 1) return;
@@ -354,6 +354,8 @@ writer = {
             if (ind1 == 0 && ind2 >= line.text().length-1) toBeDeleted.push(line);
         });
         toBeDeleted.forEach(l=>this.deleteSpecificLine(l.number));
+
+        selection.cancel();
     },
     moveCursorTo: function (x, line) {
         // TODO [delayed fix]: Fix bug that occurs when one click on the middle of a letter
@@ -365,7 +367,7 @@ writer = {
         cursor.setPos(cursor.x, line * 20 - 20)
         cursor.moveApproxX(x, this.lines[this.currentline - 1].text());
     },
-    moveCursorVert: function (direction) {
+    moveCursorVert: function (direction, ctrlDown=false) {
         if (this.currentline + direction == 0 || this.currentline + direction > this.lines.length){
              return cursor.resetBlink();
         }
@@ -381,7 +383,7 @@ writer = {
         cursor.changeLine(firstline.text(), textB, direction=direction);
         return true;
     },
-    moveCursorHoriz: function (direction) {
+    moveCursorHoriz: function (direction, ctrlDown=false) {
         var line = this.lines[this.currentline - 1];
         if (cursor.textPos + direction < 0){
             if(this.moveCursorVert(-1)) cursor.setText(this.lines[this.currentline - 1].text());
@@ -389,7 +391,12 @@ writer = {
         else if (cursor.textPos + direction > line.text().length){
             if(this.moveCursorVert(1)) cursor.setText("");
         }
-        else {cursor.setText(line.text().slice(0, cursor.textPos + direction));}
+        else {
+            if (!ctrlDown) cursor.setText(line.text().slice(0, cursor.textPos + direction));
+            else {
+                cursor.setText(line.text().slice(0, cursor.getCtrlMovementNewPos(line.text(), direction)));
+            }
+        }
         cursor.vertMovementPos = null;
     }
 }
@@ -492,7 +499,12 @@ selection = {
             result.push([mid[0], i * 20 + mid[1], mid[2]]);
         }
         if (end[3] != 0) result.push([end[0], end[1], end[2]]);
-        console.log(result);
         return result;
+    },
+    direction: function () {
+        if (this.startY > cursor.y || (this.startY == cursor.y && this.startX > cursor.x)) {return -1;}
+        return 1;
     }
 }
+
+scroll = {}
