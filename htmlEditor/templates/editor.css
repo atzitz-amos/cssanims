@@ -73,8 +73,8 @@ body {max-width: 100vw; max-height: 100vh; flex-direction: column;margin:0; back
 .tree-file:hover, .tree-node-title:hover {color: #797979; cursor: pointer;}
 .tree-file:active {translate: 1px 1px;}
 
-.tabmanager{height: fit-content; padding: 5px; padding-bottom: 0px;}
-.tabcontent{height: 80%; padding: 10px 10px 14px 5px; margin-left: 5px; overflow: hidden;}
+.tabmanager{height: fit-content; padding: 5px 5px 0px 0px; background: #1d1e22;}
+.tabcontent{height: 80%; padding: 0px 10px 0px 5px; margin-left: 5px; overflow: hidden;}
 
 .tabheader{
     color: #efebeb;
@@ -87,16 +87,20 @@ body {max-width: 100vw; max-height: 100vh; flex-direction: column;margin:0; back
 }
 .tabheader:hover{background: #767983;}
 
-.tabheader[selected], .tabcontent {background: #32343b;}
+.tabheader[selected], .tab {background: #32343b;}
 
 .tab-lines{
     width: 20px;
+    height: var(--component-editor-layer-abs-height);
+    min-height: calc(var(--component-editor-layer-abs-height) + 100%);
     padding-right: 2px;
     border-right: 1px solid black;
     color: #8e8d8d;
     flex-direction: column;
     justify-content: flex-start;
     overflow: hidden;
+    position: relative;
+    top: var(--scroll);
 }
 .tab-line-number{
     box-sizing: border-box;
@@ -130,7 +134,7 @@ body {max-width: 100vw; max-height: 100vh; flex-direction: column;margin:0; back
 .tab-editor-cursor[hidden] {opacity: 0;}
 .editor-input {width: 1em; height: var(--component-line-abs-height); opacity: 0; position: relative;}
 
-.editor-layer {position: absolute; width: 100%; overflow: hidden; height: 100%;}
+.editor-layer {position: absolute; width: 100%; overflow: hidden; height: calc(var(--component-editor-layer-abs-height) + 20px); top: var(--scroll);}
 .active-line {background: #76767652; z-index: 1; position: relative;}
 .editor-selection {z-index: 2;}
 .editor-inner {z-index: 3; flex-direction: column; color: #d6d1d1;}
@@ -146,3 +150,5 @@ body {max-width: 100vw; max-height: 100vh; flex-direction: column;margin:0; back
 }
 
 .selection {position: absolute; background: #446789; height: var(--component-line-abs-height);}
+
+.tab {width:100%; height:100%; flex-direction: column; gap: 10px;}

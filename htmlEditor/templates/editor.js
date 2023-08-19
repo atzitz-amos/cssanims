@@ -1,20 +1,264 @@
 
-// CONSTANTS
+// EVENTS
 
+eventDispatcher = {
+    scopes: {},
+    eventListeners: {},
+    _createscopeobj: function (obj, newobj=undefined) {
+        function destructurateName(n, o) {
+            var temp = o;
+            n.split("/").slice(0, -1).forEach(x => {
+                if (!(x in temp)) {
+                    temp[x] = {};
+                }
+                temp = temp[x];
+            });
+            return temp;
+        }
+
+        newobj = newobj == undefined ? {} : newobj;
+        for (name in obj) {
+            if (typeof obj[name] === "function") {
+                var lindex = name.lastIndexOf("!");
+                var priority = lindex == -1 ? 0 : name.slice(name.indexOf("!"), lindex+1).length
+                var nname = lindex == -1 ? name : name.slice(0, lindex-1)
+                nname.split("|").forEach(n => {
+                    var temp = destructurateName(n, newobj);
+                    let arr = n.split("/");
+                    let x = arr[arr.length - 1];
+                    if (! (x in temp)) {temp[x] = [];}
+                    temp[x].push([priority, obj[name]]);
+                });
+            }
+            else {
+                var temp = destructurateName(name, newobj);
+                let arr = name.split("/");
+                let lastname = arr[arr.length - 1];
+                temp[lastname] = (this._createscopeobj(obj[name], temp[lastname]));
+            }
+        }
+        return newobj;
+    },
+    scope: function (name, obj) {
+        this.scopes[name] = this._createscopeobj(obj);
+    },
+    listen: function (event, func) {
+        if (arguments.length > 2) {
+            const [...args] = arguments;
+            args.slice(0, -1).forEach(ev=>this.listen(ev, args[args.length - 1]));
+        }
+        else {
+            if (!(event in this.eventListeners)) {
+                this.eventListeners[event] = [];
+            }
+            var lindex = event.lastIndexOf("!");
+            var priority = lindex == -1 ? 0 : event.slice(event.indexOf("!"), lindex+1).length
+            event = lindex == -1 ? event : event.slice(0, lindex-1)
+            this.eventListeners[event].push([priority, func]);
+        }
+    },
+    dispatch: function (event, ...args) {
+        function invokeSelectionEvent (...a) {
+            return eventDispatcher.dispatch("selection/event/" + event, ...a);
+        }
+
+        if (event == "init") {
+            for (let scope in this.scopes) {
+                if ("init" in this.scopes[scope]) {
+                    this.scopes[scope]["init"].forEach(x=>x[1](...args));
+                }
+            }
+            return;
+        }
+
+        var callStack = [];
+
+        if (!(event.startsWith("selection")) && selection.selectionActive) {
+            callStack.push([1, invokeSelectionEvent]);
+        }
+        const [scope, ...namespace] = event.split("/");
+        if (scope in this.scopes) {
+            var obj = this.scopes[scope];
+            namespace.forEach(el => {if(obj != undefined && el in obj) {obj = obj[el];} else {obj = undefined;}});
+            if(obj != undefined) {callStack = callStack.concat(obj);}
+        }
+        if (event in this.eventListeners) {
+            callStack = callStack.concat(this.eventListeners[event]);
+        }
+        var result = undefined;
+        callStack.sort((a, b) => b[0] - a[0]).forEach(call => {
+            if (result) {
+                return;
+            }
+            result = call[1](...args);
+        });
+        return result;
+    }
+}
+
+// CONSTANTS
 const BLOCK_CTRL_MOVEMENT = [":", ".", ";", ",", "(", ")", "[", "]", "{", "}", " "];
 
+// EVENT LISTENERS
+
+eventDispatcher.scope("window", {
+    init: function () {
+        var screenW = screen.width, screenH = screen.height;
+        var body = document.body;
+        body.style.setProperty("--component-editor-abs-height", "40vh");
+        body.style.setProperty("--component-editor-abs-width", "94vw");
+        body.style.setProperty("--component-editor-layer-abs-height", "20px");
+
+        body.style.setProperty("--component-line-abs-height", "20px");
+        var t = document.querySelector(".tab-editor")
+        body.style.setProperty("--component-line-abs-width", t.clientWidth - 5 + "px");
+    },
+    resize: function () {
+        var screenW = screen.width, screenH = screen.height;
+        var body = document.body;
+        body.style.setProperty("--component-editor-abs-height", "40vh");
+        body.style.setProperty("--component-editor-abs-width", "94vw");
+
+        body.style.setProperty("--component-line-abs-height", "20px");
+        var t = document.querySelector(".tab-editor")
+        body.style.setProperty("--component-line-abs-width", t.clientWidth - 5 + "px");
+    }
+});
+
+eventDispatcher.scope("input", {
+    input: function (e) {
+        writer.writeText(e.data)
+        e.target.value = "";
+    }
+});
+
+eventDispatcher.scope("keyboard", {
+    "keydown": function (e) {selection.setCursorPrevPos(cursor.x, cursor.y);},
+    "key": {
+        "left|right|up|down|end|home!!": function (e) {
+            if(e.shiftKey) selection.setActive(true);
+        },
+        "backspace": function (e) {
+            writer.deletePrevChar(e.ctrlKey);
+        },
+        "enter": function (e) {
+            writer.writeLine();
+        },
+        "left": function (e) {
+            writer.moveCursorHoriz(-1, e.ctrlKey);
+        },
+        "right": function (e) {
+            writer.moveCursorHoriz(1, e.ctrlKey);
+        },
+        "up": function (e) {
+            writer.moveCursorVert(-1, e.ctrlKey);
+        },
+        "down": function (e) {
+            writer.moveCursorVert(1, e.ctrlKey);
+        },
+        "tab": function (e) {
+            writer.writeText("\t")
+            e.preventDefault();
+        },
+        "home": function (e) {
+            cursor.setText("");
+        },
+        "end": function (e) {
+            cursor.setText(writer.lines[writer.currentline-1].text());
+        },
+        "delete": function (e) {
+            writer.deleteNextChar(e.ctrlKey);
+        },
+        "ctrl/a": function (e) {
+            selection.setCursorPrevPos(0, 0);
+            selection.setActive(true);
+            var length = writer.lines.length - 1;
+            selection.update(parseInt(writer.lines[length].text().length * cursor.getWidth("a")), length * 20);
+        },
+        "ctrl/c": function (e) {
+
+        }
+    }
+});
+
+eventDispatcher.scope("mouse", {
+    "down": function (e) {
+        selection.setCursorPrevPos(cursor.x, cursor.y);
+        if (e.shiftKey) selection.setActive(true);
+        else selection.cancel();
+
+        var rect = document.querySelector("#line-1").getBoundingClientRect();
+        var x = e.x - rect.x; var y = e.y - rect.y;
+        const line = Math.ceil(y / 20);
+        writer.moveCursorTo(x, line);
+    },
+    "move": function (e) {
+        if(e.buttons == 1){
+            if(!selection.selectionActive) selection.setCursorPrevPos(cursor.x, cursor.y);
+            selection.setActive(true);
+            var rect = document.querySelector("#line-1").getBoundingClientRect();
+            var x = e.x - rect.x; var y = e.y - rect.y;
+            const line = Math.ceil(y / 20);
+            writer.moveCursorTo(x, line);
+        }
+    },
+    "wheel": function (e) {scroll.scrollAdd(e.deltaY)}
+});
+
+eventDispatcher.scope("selection", {
+    "event": {
+        "keyboard/key": {
+            "left": function (e) {
+                if(!e.shiftKey) {
+                    if (selection.direction() == 1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
+                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
+                    selection.cancel();
+                    return true;
+                }
+            },
+            "right": function (e) {
+                if(!e.shiftKey) {
+                    if (selection.direction() == -1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
+                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
+                    selection.cancel();
+                    return true;
+                }
+            },
+            "down": function (e) {
+                if(!e.shiftKey) {
+                    writer.moveCursorTo(selection.currentX, selection.currentY / 20 + 1)
+                    selection.cancel();
+                }
+            },
+            "up": function (e) {
+                console.log(selection);
+                if(!e.shiftKey) {
+                    writer.moveCursorTo(selection.currentX, selection.prevY / 20 + 1)
+                    selection.cancel();
+                }
+            },
+        }
+    }
+});
+
+eventDispatcher.scope("writer", {
+    "line|delete/line": function () {
+        scroll.onLineCountChange(writer.lines.length);
+    },
+    "delete/line": function (ln) {
+        scroll.onLineDelete(ln.number, ln.number - 1);
+    }
+});
+
+eventDispatcher.scope("cursor", {
+    "line-change": function (x, last, new_) {
+        scroll.onLineChange(last, new_);
+    }
+});
+
+// END EVENTS LISTENER
+
 // DYNAMIC SIZING
-
-function updateDynamicSizing() {
-    var screenW = screen.width, screenH = screen.height;
-    var body = document.body;
-    body.style.setProperty("--component-editor-abs-height", "40vh");
-    body.style.setProperty("--component-editor-abs-width", "94vw");
-
-    body.style.setProperty("--component-line-abs-height", "20px");
-    var t = document.querySelector(".tab-editor")
-    body.style.setProperty("--component-line-abs-width", t.clientWidth - 5 + "px");
-}
 
 size = {
     getLineWidth: function () {
@@ -40,88 +284,52 @@ window.onload = () => {
 
     cursor.init();
     writer.init();
+    eventDispatcher.dispatch("init")
 
-    updateDynamicSizing();
-    window.addEventListener("resize", ev=>updateDynamicSizing());
+    window.addEventListener("resize", ev=>eventDispatcher.dispatch("window/resize"));
 
-    document.querySelector(".editor-input").addEventListener("input", (e) => {
-        writer.writeText(e.data)
-        e.target.value = "";
-    });  // input
+    document.querySelector(".editor-input").addEventListener("input", (e) => eventDispatcher.dispatch("input/input", e));  // input
 
     document.querySelector(".editor-input").addEventListener("keydown", (e) => {
-        selection.setCursorPrevPos(cursor.x, cursor.y);
-        if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'End', 'Home'].includes(e.code)) {
-            if(e.shiftKey) selection.setActive(true);
-            else if (selection.selectionActive){
-                if (e.code == "ArrowLeft") {
-                    if (selection.direction() == 1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
-                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
-                }
-                else if (e.code == "ArrowRight") {
-                    if (selection.direction() == -1) writer.moveCursorTo(selection.startX, selection.startY / 20 + 1);
-                    else writer.moveCursorTo(cursor.x, cursor.y / 20 + 1);
-                }
-                return selection.cancel();
+        eventDispatcher.dispatch("keyboard/keydown", e);
+
+        function map(k) {
+            switch (k) {
+                case "ArrowLeft":
+                    return "left";
+                case "ArrowRight":
+                    return "right";
+                case "ArrowUp":
+                    return "up";
+                case "ArrowDown":
+                    return "down";
+                default:
+                    return k.toLowerCase();
             }
         }
-        switch (e.key) {
-            case "Backspace":
-                writer.deletePrevChar(e.ctrlKey);
-                break;
-            case "Enter":
-                writer.writeLine();
-                break;
-            case "ArrowLeft":
-                writer.moveCursorHoriz(-1, e.ctrlKey);
-                break;
-            case "ArrowRight":
-                writer.moveCursorHoriz(1, e.ctrlKey);
-                break;
-            case "ArrowUp":
-                writer.moveCursorVert(-1, e.ctrlKey);
-                break;
-            case "ArrowDown":
-                writer.moveCursorVert(1, e.ctrlKey);
-                break;
-            case "Tab":
-                writer.writeText("\t")
-                e.preventDefault();
-                break;
-            case "Home":
-                cursor.setText("");
-                break;
-            case "End":
-                cursor.setText(writer.lines[writer.currentline-1].text());
-                break;
-            case "Delete":
-                writer.deleteNextChar(e.ctrlKey);
-                break;
+        
+        var name = map(e.key);
+        
+        eventDispatcher.dispatch("keyboard/key/"+name, e);
+        if (e.ctrlKey) {
+            eventDispatcher.dispatch("keyboard/key/ctrl/" + name, e);
+        }
+        if (e.shiftKey) {
+            eventDispatcher.dispatch("keyboard/key/shift/" + name);
+        }
+        if (e.altKey) {
+            eventDispatcher.dispatch("keyboard/key/alt/" + name);
         }
     });  // keys
 
     document.querySelector(".tab-editor").addEventListener("mousedown", (e) => {
         e.preventDefault()
-        selection.setCursorPrevPos(cursor.x, cursor.y);
-        if (e.shiftKey) selection.setActive(true);
-        else selection.cancel();
-
-        var rect = document.querySelector("#line-1").getBoundingClientRect();
-        var x = e.x - rect.x; var y = e.y - rect.y;
-        const line = Math.ceil(y / 20);
-        writer.moveCursorTo(x, line);
+        eventDispatcher.dispatch("mouse/down", e);
     });  // click down
 
-    document.querySelector(".tab-editor").addEventListener("mousemove", e => {
-        if(e.buttons == 1){
-            if(!selection.selectionActive) selection.setCursorPrevPos(cursor.x, cursor.y);
-            selection.setActive(true);
-            var rect = document.querySelector("#line-1").getBoundingClientRect();
-            var x = e.x - rect.x; var y = e.y - rect.y;
-            const line = Math.ceil(y / 20);
-            writer.moveCursorTo(x, line);
-        }
-    });  // pointer
+    document.querySelector(".tab-editor").addEventListener("mousemove", e => {eventDispatcher.dispatch("mouse/move", e)});  // pointer
+
+    document.querySelector(".tab-editor").addEventListener("mousewheel", e => {eventDispatcher.dispatch("mouse/wheel", e)});  // pointer
 };
 
 
@@ -206,6 +414,7 @@ cursor = {
     cursor: function () {return document.querySelector(".tab-editor-cursor");},
     input: function () {return document.querySelector(".editor-input");},
     setPos: function (x, y) {
+        eventDispatcher.dispatch("cursor/pos", x, y);
         selection.setCursorPrevPos(this.x, this.y);
         this.cursor().style.left = x+"px";
         this.cursor().style.top = y+"px";
@@ -213,6 +422,7 @@ cursor = {
         this.input().style.top = y+"px";
         this.x = x;
         this.y = y;
+        this.textPos = parseInt(x / this.getWidth("a"));
         this.input().focus();
         this.resetBlink();
         selection.update(x, y);
@@ -228,6 +438,7 @@ cursor = {
         return parseInt(sizer.clientWidth);
     },
     changeLine: function (textA, textB, direction=-1) {
+        eventDispatcher.dispatch("cursor/line-change", this.getWidth(textB), parseInt(this.y / 20), parseInt((this.y + 20 * direction) / 20));
         this.setPos(this.getWidth(textB), this.y + 20 * direction);
         this.textPos = textB.length;
     },
@@ -266,12 +477,16 @@ writer = {
         this.lines.push(new Line(1, document.getElementById("line-1"), true));
     },
     writeText: function (text) {
+        eventDispatcher.dispatch("writer/text", this.lines[this.currentline-1], text);
         if (selection.selectionActive) {
             this.deleteSelectionContent();
         }
         cursor.setText(this.lines[this.currentline - 1].write(text, cursor.textPos));
     },
     writeLine: function () {
+        if (selection.selectionActive) {
+            this.deleteSelectionContent();
+        }
         var prevline = this.lines[this.currentline - 1]
         prevline.setCurrent(false);
         var toMove = "";
@@ -284,6 +499,7 @@ writer = {
         line.setCurrent(true);
         line.append(toMove);
         cursor.changeLine(this.lines[this.currentline - 2].text(), "", direction=1);
+        eventDispatcher.dispatch("writer/line", this.lines[this.currentline-1])
     },
     insertLine: function (index) {
         line = document.createElement("div");
@@ -303,6 +519,7 @@ writer = {
         this.lines.splice(index-1, 0, new Line(this.currentline, line, true));
     },
     deletePrevChar: function (ctrlDown=false) {
+        eventDispatcher.dispatch("writer/delete/prev", this.lines[this.currentline-1], ctrlDown);
         if (selection.selectionActive) return this.deleteSelectionContent();
         if(this.lines[this.currentline - 1].empty()) return this.deleteLine();
         else if(cursor.textPos == 0){
@@ -326,11 +543,13 @@ writer = {
         this.currentline--;
         cursor.changeLine(this.lines[this.currentline].text(), this.lines[this.currentline - 1].text());
         this.lines[this.currentline - 1].setCurrent(true);
-
         this.lines.splice(this.currentline, 1);
+
+        eventDispatcher.dispatch("writer/delete/line", this.lines[this.currentline - 1]);
     },
     deleteSpecificLine: function (ln) {
         if(ln == 1) return;
+        var toMove = "";
         this.lines[ln-1].deleteLine();
         // line number
         var lnums = document.querySelector(".tab-lines");
@@ -338,24 +557,35 @@ writer = {
         Line.updateLineNumbersDown(ln, this.lines);
         if (ln <= this.currentline) {
             this.currentline--;
+            cursor.changeLine(this.lines[this.currentline-1].text(), this.lines[this.currentline-1].text());
             this.lines[this.currentline - 1].setCurrent(true);
         }
         // cursor.changeLine(this.lines[this.currentline].text(), this.lines[this.currentline-1].text());
         this.lines.splice(ln - 1, 1);
+        eventDispatcher.dispatch("writer/delete/line", ln);
     },
     deleteSelectionContent: function () {
-        var coords = selection.getLineCoords().reverse();
+        var coords = selection.getLineCoords();
         var charLength = cursor.getWidth("a");
         var toBeDeleted = [];
-        coords.forEach(([x, y, width], index) => {
+        coords.reverse().forEach(([x, y, width], index) => {
             let line = this.lines[y / 20];
             let ind1 = x / charLength, ind2 = (width+x) / charLength;
+            if (ind2 - ind1 > line.text().length) {
+                if (line.number < this.lines.length) toBeDeleted.push(this.lines[line.number]);
+            }
             cursor.setText(line.deleteText(ind1, ind2));
-            if (ind1 == 0 && ind2 >= line.text().length-1) toBeDeleted.push(line);
         });
-        toBeDeleted.forEach(l=>this.deleteSpecificLine(l.number));
+        toBeDeleted.forEach(l => {
+            if (l.text().length != 0) {
+                this.lines[l.number - 2].append(l.text());
+            }
 
+            this.deleteSpecificLine(l.number);
+        });
+        cursor.setPos(selection.prevX, cursor.y)
         selection.cancel();
+        eventDispatcher.dispatch("writer/delete/selection",)
     },
     moveCursorTo: function (x, line) {
         // TODO [delayed fix]: Fix bug that occurs when one click on the middle of a letter
@@ -507,4 +737,36 @@ selection = {
     }
 }
 
-scroll = {}
+scroll = {
+    // TODO: bug when writing a character when line is hidden
+    amount: 0,
+    height: 20,
+    onLineCountChange: function (count) {
+        this.height = count * 20;
+        document.body.style.setProperty('--component-editor-layer-abs-height', this.height+"px");
+    },
+    onLineChange: function (last, new_) {
+        var start = parseInt(-this.amount / 20);
+        var maxLines = 10;
+        if (new_ - start > maxLines || new_ - start < 0) {
+            this.amount += 20 * (last - new_);
+        }
+        document.body.style.setProperty("--scroll", this.amount + "px");
+    },
+    onLineDelete: function (last, new_) {
+        var start = parseInt(-this.amount / 20);
+        var maxLines = 10;
+        if (start != 0 && new_ - start < maxLines - 2) {
+            this.amount += 20 * (last - new_);
+        }
+        document.body.style.setProperty("--scroll", this.amount + "px");
+    },
+    scrollAdd: function (delta) {
+        delta = delta * -0.3;
+        if (writer.lines.length < 12) return;
+        if (this.amount + delta >= 0) {this.amount = 0;}
+        else if (this.amount + delta < -writer.lines.length * 20 + 11 * 20) {this.amount = -writer.lines.length * 20 + 11 * 20;}
+        else this.amount += delta;
+        document.body.style.setProperty("--scroll", this.amount + "px");
+    }
+}
