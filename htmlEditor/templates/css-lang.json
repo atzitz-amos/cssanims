@@ -1,0 +1,67 @@
+
+
+{
+    "definitions": {
+        "selector": {
+            "definition": "selector-names '{' suite '}'"
+        },
+        "selector-names": {
+            "definition": "selector-id[combinator selector-id]*"
+        },
+        "combinator": {
+            "definition": "and-combinator | or-combinator | child-combinator"
+        },
+        "and-combinator": {
+            "definition": "''"
+        },
+        "or-combinator": {
+            "definition": "','"
+        },
+        "child-combinator": {
+            "definition": "'+' | '>' | ' ' | '~' | '|' |"
+        },
+        "pseudo-class": {
+            "definition": "name"
+        },
+        "pseudo-element": {
+            "definition": "name"
+        },
+        "selector-id": {
+            "definition": "selector-name [':'pseudo-class] ['::'pseudo-element]"
+        },
+        "selector-name": {
+            "definition": "class-selector | id-selector | data-selectors | element-selector | universal-selector"
+        },
+        "class-selector": {
+            "definition": "'.'name"
+        },
+        "id-selector": {
+            "definition": "'#'name"
+        },
+        "universal-selector": {
+            "definition": "'*'"
+        },
+        "data-selectors": {
+            "definition": "'[' data-selector-name [data-selector-equality data-selector-value [data-selector-flag]] ']'"
+        },
+        "data-selector-name": {
+            "definition": "name"
+        },
+        "data-selector-equality": {
+            "list": [
+                "=", "$=", "~=", "|=", "^=", "*="
+            ]
+        },
+        "data-selector-value": {
+            "definition": "identifier"
+        },
+        "data-selector-flag": {
+            "list": [
+                "s", "i", "I", "S"
+            ]
+        },
+        "element-selector": {
+            "definition": "name"
+        }
+    }
+}
