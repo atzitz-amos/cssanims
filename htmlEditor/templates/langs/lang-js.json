@@ -1,0 +1,118 @@
+{
+  "definitions": {
+    "string": {
+      "regex": "(\"|'|`).*(\"|'|`)",
+      "priority": 10
+    },
+    "keyword": {
+      "list": [
+        "break",
+        "byte",
+        "case",
+        "catch",
+        "char",
+        "class",
+        "const",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "double",
+        "else",
+        "enum",
+        "eval",
+        "export",
+        "extends",
+        "false",
+        "final",
+        "finally",
+        "float",
+        "for",
+        "function",
+        "goto",
+        "if",
+        "implements",
+        "import",
+        "in",
+        "instanceof",
+        "int",
+        "interface",
+        "let",
+        "long",
+        "native",
+        "new",
+        "null",
+        "package",
+        "private",
+        "protected",
+        "public",
+        "return",
+        "short",
+        "static",
+        "super",
+        "switch",
+        "synchronized",
+        "this",
+        "throw",
+        "throws",
+        "transient",
+        "true",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "volatile",
+        "while",
+        "with",
+        "yield"
+      ]
+    },
+    "var-let-def": {
+      "definition": "'let' var-let = identifier"
+    },
+    "var-var-def": {
+      "definition": "('var' | '') var-var = identifier"
+    },
+    "var-const-def": {
+      "definition": "'const' var-const = identifier"
+    },
+    "var-let": {
+      "definition": "identifier"
+    },
+    "var-var": {
+      "definition": "identifier"
+    },
+    "var-const": {
+      "definition": "identifier"
+    },
+    "name": {
+      "regex": "\\W+"
+    },
+    "func-name": {
+      "definition": "name"
+    },
+
+    "function-call": {
+      "definition": "func-name '(' [parameter-list] ')'"
+    },
+    "method-call": {
+      "definition": "name'.'func-name '(' [parameter-list]')'"
+    },
+    "parameter-list": {
+      "definition": "parameter [','parameter]*"
+    },
+    "parameter": {
+      "definition": "parameter-normal | parameter-definition | parameter-infinite"
+    },
+    "parameter-normal": {
+      "definition": "name"
+    },
+    "parameter-definition": {
+      "definition": "name '=' identifier"
+    },
+    "parameter-infinite": {
+      "definition": "'...'name"
+    }
+  }
+}

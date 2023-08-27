@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <title>Editor</title>
     <link rel="stylesheet" href="editor.css">
-    <script src="editor.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/eventlib.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/highlight.js"></script>
 </head>
 <body>
     <span class="sizer" style="opacity: 0; position: relative; left: -20000000px; width: min-content; height: 0;"></span>
@@ -26,8 +29,8 @@
                         <div class="tabheader" data-linkedto="tab-0" data-language="html" selected>file1.html</div>
                         <div class="tabheader" data-linkedto="tab-1" data-language="html">file2.html</div>
                     </div>
-                    <div class="tabcontent">
-                        <div class="tab-lines"><div class="tab-line-number">1</div></div>
+                    <div class="tabcontent" data-language="html">
+                        <div class="editor-gutter"><div class="tab-line"><div class="tab-line-number">1</div></div></div>
                         <div class="tab-editor">
                             <div class="editor-layer editor-inner">
                                 <div class="line" id="line-1"></div>

@@ -1,0 +1,30 @@
+
+{
+  "highlight": {
+    "bracket": {
+      "not-in": "string",
+      "regex": "[<>]"
+    },
+    "string": {
+      "regex": "[\"'].*[\"']"
+    },
+    "tag": {
+      "before": "<",
+      "regex": "[a-zA-Z0-9+",
+      "after": ".*>"
+    },
+    "closing-tag": {
+      "regex": "<\/[a-zA-Z0-9]+>"
+    },
+    "attribute": {
+      "in": "tag",
+      "before": " ",
+      "regex": "[a-zA-Z0-9]+"
+    },
+    "attribute-value": {
+      "in": "tag",
+      "before": ":attribute:",
+      "regex": "=*."
+    }
+  }
+}

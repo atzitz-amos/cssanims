@@ -1,101 +1,6 @@
 
 // EVENTS
 
-eventDispatcher = {
-    scopes: {},
-    eventListeners: {},
-    _createscopeobj: function (obj, newobj=undefined) {
-        function destructurateName(n, o) {
-            var temp = o;
-            n.split("/").slice(0, -1).forEach(x => {
-                if (!(x in temp)) {
-                    temp[x] = {};
-                }
-                temp = temp[x];
-            });
-            return temp;
-        }
-
-        newobj = newobj == undefined ? {} : newobj;
-        for (name in obj) {
-            if (typeof obj[name] === "function") {
-                var lindex = name.lastIndexOf("!");
-                var priority = lindex == -1 ? 0 : name.slice(name.indexOf("!"), lindex+1).length
-                var nname = lindex == -1 ? name : name.slice(0, lindex-1)
-                nname.split("|").forEach(n => {
-                    var temp = destructurateName(n, newobj);
-                    let arr = n.split("/");
-                    let x = arr[arr.length - 1];
-                    if (! (x in temp)) {temp[x] = [];}
-                    temp[x].push([priority, obj[name]]);
-                });
-            }
-            else {
-                var temp = destructurateName(name, newobj);
-                let arr = name.split("/");
-                let lastname = arr[arr.length - 1];
-                temp[lastname] = (this._createscopeobj(obj[name], temp[lastname]));
-            }
-        }
-        return newobj;
-    },
-    scope: function (name, obj) {
-        this.scopes[name] = this._createscopeobj(obj);
-    },
-    listen: function (event, func) {
-        if (arguments.length > 2) {
-            const [...args] = arguments;
-            args.slice(0, -1).forEach(ev=>this.listen(ev, args[args.length - 1]));
-        }
-        else {
-            if (!(event in this.eventListeners)) {
-                this.eventListeners[event] = [];
-            }
-            var lindex = event.lastIndexOf("!");
-            var priority = lindex == -1 ? 0 : event.slice(event.indexOf("!"), lindex+1).length
-            event = lindex == -1 ? event : event.slice(0, lindex-1)
-            this.eventListeners[event].push([priority, func]);
-        }
-    },
-    dispatch: function (event, ...args) {
-        function invokeSelectionEvent (...a) {
-            return eventDispatcher.dispatch("selection/event/" + event, ...a);
-        }
-
-        if (event == "init") {
-            for (let scope in this.scopes) {
-                if ("init" in this.scopes[scope]) {
-                    this.scopes[scope]["init"].forEach(x=>x[1](...args));
-                }
-            }
-            return;
-        }
-
-        var callStack = [];
-
-        if (!(event.startsWith("selection")) && selection.selectionActive) {
-            callStack.push([1, invokeSelectionEvent]);
-        }
-        const [scope, ...namespace] = event.split("/");
-        if (scope in this.scopes) {
-            var obj = this.scopes[scope];
-            namespace.forEach(el => {if(obj != undefined && el in obj) {obj = obj[el];} else {obj = undefined;}});
-            if(obj != undefined) {callStack = callStack.concat(obj);}
-        }
-        if (event in this.eventListeners) {
-            callStack = callStack.concat(this.eventListeners[event]);
-        }
-        var result = undefined;
-        callStack.sort((a, b) => b[0] - a[0]).forEach(call => {
-            if (result) {
-                return;
-            }
-            result = call[1](...args);
-        });
-        return result;
-    }
-}
-
 // CONSTANTS
 const BLOCK_CTRL_MOVEMENT = [":", ".", ";", ",", "(", ")", "[", "]", "{", "}", " "];
 
@@ -177,6 +82,11 @@ eventDispatcher.scope("keyboard", {
         },
         "ctrl/c": function (e) {
 
+        },
+        "ctrl/v": function (e) {
+            navigator.clipboard.readText().then(text => {
+                console.log(text);
+            });
         }
     }
 });
@@ -374,23 +284,23 @@ class Line {
     }
 
     static updateLineNumbersUp(index, lines, lineN){
-        var lineC = document.querySelector(".tab-lines");
+        var gutter = document.querySelector(".editor-gutter");
         var toAddBefore = null;
-        lineC.childNodes.forEach((el, i) => {
+        gutter.childNodes.forEach((el, i) => {
             if (i == index - 1) {toAddBefore = el;}
             if(i >= index - 1) {
-                el.textContent = i + 2;
+                el.childNodes[0].textContent = i + 2;
                 lines[i].element.id = "line-" + (i + 2);
                 lines[i].number = i + 2;
             }
         });
-        lineC.insertBefore(lineN, toAddBefore);
+        gutter.insertBefore(lineN, toAddBefore);
     }
 
     static updateLineNumbersDown(index, lines) {
-        var lineC = document.querySelector(".tab-lines");
+        var gutter = document.querySelector(".editor-gutter");
         var toBeRemoved = null;
-        lineC.childNodes.forEach((num, i) => {
+        gutter.childNodes.forEach((num, i) => {
             if(i == index - 1) {toBeRemoved=num;}
             if(i > index - 1) {
                 num.textContent = i;
@@ -398,7 +308,7 @@ class Line {
                 lines[i].number = i;
             }
         });
-        lineC.removeChild(toBeRemoved);
+        gutter.removeChild(toBeRemoved);
     }
 }
 
@@ -482,6 +392,7 @@ writer = {
             this.deleteSelectionContent();
         }
         cursor.setText(this.lines[this.currentline - 1].write(text, cursor.textPos));
+        eventDispatcher.dispatch("writer/change", this.lines[this.currentline - 1]);
     },
     writeLine: function () {
         if (selection.selectionActive) {
@@ -500,6 +411,7 @@ writer = {
         line.append(toMove);
         cursor.changeLine(this.lines[this.currentline - 2].text(), "", direction=1);
         eventDispatcher.dispatch("writer/line", this.lines[this.currentline-1])
+        eventDispatcher.dispatch("writer/change", this.lines[this.currentline-1])
     },
     insertLine: function (index) {
         line = document.createElement("div");
@@ -509,18 +421,25 @@ writer = {
         if (index == container.childNodes.length-1) {container.appendChild(line);}
         else {container.insertBefore(line, this.lines[index-1].element);}
         /* LINE NUMBER */
+        var lineC = document.createElement("div");
+        lineC.className = "tab-line";
         lineN = document.createElement("div");
         lineN.className = "tab-line-number";
         lineN.textContent = index;
-        if(this.currentline >= 10) {lineN.style.marginRight = "2px";}
-        var lineC = document.querySelector(".tab-lines");
-        if(index == lineC.childNodes.length + 1) {lineC.appendChild(lineN);}
-        else {Line.updateLineNumbersUp(index, this.lines, lineN);}
+        lineC.appendChild(lineN);
+        var gutter = document.querySelector(".editor-gutter");
+        if(index == gutter.childNodes.length + 1) {
+            gutter.appendChild(lineC);
+        }
+        else {Line.updateLineNumbersUp(index, this.lines, lineC);}
         this.lines.splice(index-1, 0, new Line(this.currentline, line, true));
     },
     deletePrevChar: function (ctrlDown=false) {
         eventDispatcher.dispatch("writer/delete/prev", this.lines[this.currentline-1], ctrlDown);
-        if (selection.selectionActive) return this.deleteSelectionContent();
+        if (selection.selectionActive) {
+            this.deleteSelectionContent();
+            return eventDispatcher.dispatch("writer/change", this.lines[this.currentline]);
+        }
         if(this.lines[this.currentline - 1].empty()) return this.deleteLine();
         else if(cursor.textPos == 0){
             if(this.currentline == 1) return;
@@ -537,7 +456,7 @@ writer = {
         if(this.currentline == 1) return;
         this.lines[this.currentline - 1].deleteLine();
         // line number
-        var lnums = document.querySelector(".tab-lines");
+        var lnums = document.querySelector(".editor-gutter");
         var toBeRemoved = null;
         Line.updateLineNumbersDown(this.currentline, this.lines);
         this.currentline--;
@@ -546,13 +465,14 @@ writer = {
         this.lines.splice(this.currentline, 1);
 
         eventDispatcher.dispatch("writer/delete/line", this.lines[this.currentline - 1]);
+        eventDispatcher.dispatch("writer/change", this.lines[this.currentline - 1]);
     },
     deleteSpecificLine: function (ln) {
         if(ln == 1) return;
         var toMove = "";
         this.lines[ln-1].deleteLine();
         // line number
-        var lnums = document.querySelector(".tab-lines");
+        var lnums = document.querySelector(".editor-gutter");
         var toBeRemoved = null;
         Line.updateLineNumbersDown(ln, this.lines);
         if (ln <= this.currentline) {
