@@ -78,10 +78,10 @@
             "definition": "quote-string | double-quote-string"
         },
         "quote-string": {
-            "regex": "'.*'"
+            "regex": "'[^']*'"
         },
         "double-quote-string": {
-            "regex": "\".*\""
+            "regex": "\"[^\"]*\""
         },
         "angle": {
             "definition": "number 'deg' | 'rad' | 'grad' | 'turn'"

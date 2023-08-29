@@ -1,6 +1,7 @@
 
 
 class RegexDefinition {
+    type = "regex";
     constructor (name, regex) {
         this.name = name;
         this.regex = regex;
@@ -8,13 +9,32 @@ class RegexDefinition {
 }
 
 class Definition {
+    type = "definition";
     constructor (name, definition) {
         this.name = name;
         this.definition = definition;
     }
+    getAllReferences() {
+        return Definition._getAllReferences(this.definition);;
+    }
+
+    static _getAllReferences(ctx) {
+        var result = [];
+        for (var i = 0; i < ctx.content.length; i++) {
+            var el = ctx.content[i];
+            if (el instanceof Context) {
+                result = result.concat(this._getAllReferences(el));
+            }
+            if (el instanceof Definition || el instanceof ListDefinition || el instanceof RegexDefinition) {
+                result.push(el);
+            }
+        }
+        return result;
+    }
 }
 
 class ListDefinition {
+    type = "list";
     constructor (name, list) {
         this.name = name;
         this.list = list;
@@ -212,11 +232,49 @@ class Language {
     constructor(name, defs) {
         this.name = name;
         this.definitions = defs;
+        this.def_list = [];
+        this.topmost = [];
+        for (var el in defs) {
+            this.def_list.push(defs[el]);
+            if (defs[el].refcount==0) this.topmost.push(defs[el]);
+        }
     }
     toString() {
         return `<Language '${this.name}' definitions=${this.definitions}>`;
     }
-    function identify(text) {
+
+    _create_chain(node) {
+        var chain = [node];
+        node.definition.content.forEach(x=>{
+            if (x instanceof Definition) {
+                x.getAllReferences().forEach(y=>{
+                    if (y instanceof Definition) chain = chain.concat(this._create_chain(y));
+                    else chain.push(y);
+                });
+            }
+            else if (x instanceof ListDefinition || x instanceof RegexDefinition) {
+                chain.push([x]);
+            }
+        });
+        return [...new Set(chain)];
+    }
+
+    label(text) {
+        for (var i=0; i<this.topmost.length; i++) {
+            var node = this.topmost[i];
+            if (node.type == "definition") {
+                var chain = this._create_chain(node);
+                console.log(node, chain);
+            }
+        }
+    }
+    identifyDefinition (text, definition) {
+
+    }
+    identifyList (text, list) {
+
+    }
+    identifyRegex (text, regex) {
 
     }
 

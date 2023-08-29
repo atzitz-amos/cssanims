@@ -23,7 +23,3 @@ Array.prototype.split = function (pattern) {
     }
     return result;
 }
-
-Array.prototype.first = function (condition) {
-    return this.filter(condition)[0];
-}

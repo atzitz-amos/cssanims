@@ -1,7 +1,7 @@
 
 
 function highlight (lang, txt) {
-    console.log(lang, txt);
+    lang.label(txt);
 }
 
 
