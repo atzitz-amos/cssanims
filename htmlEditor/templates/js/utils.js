@@ -9,7 +9,6 @@ function findAllRegex(regex, str) {
 }
 
 function findAll(pattern, str) {
-    console.log(str, pattern);
     var i = str.indexOf(pattern);
     var result = i == -1 ? [] : [i];
     while (true) {

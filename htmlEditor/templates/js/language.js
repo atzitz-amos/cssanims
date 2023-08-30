@@ -219,7 +219,7 @@ class LanguageParser {
 }
 
 async function _load(name) {
-    var definition = await fetch("http://localhost:63342/cssanims/htmlEditor/templates/langs/lang-"+name+".json")
+    var definition = await fetch("http://localhost:63342/cssanims2/htmlEditor/templates/langs/lang-"+name+".json")
         .then(x=>x.json())
         .then(lang=>{
             return new Language(name, LanguageParser.load(lang.definitions));
@@ -227,6 +227,19 @@ async function _load(name) {
     return definition;
 }
 
+
+class Tokenizer {
+    constructor (text) {
+        this.text = text;
+        this.cursor = -1;
+        this.checkpoint = 0;
+    }
+    seek () {return this.text.charAt(this.cursor+1)}
+    checkpoint () {this.checkpoint = this.cursor;}
+    get () {return this.text.substring(this.checkpoint, this.cursor);}
+    tell () {return this.text.charAt(this.cursor++);}
+    empty () {return this.cursor == this.text.length}
+}
 
 class Language {
     constructor(name, defs) {
@@ -247,7 +260,7 @@ class Language {
         function _(name, r, arr) {
             var result = [name];
             r.forEach(x=>{
-                result = result.concat(_(x, arr[x], arr))
+                result = result.concat(_(x, arr[x], arr));
             });
             return result;
         }
@@ -257,10 +270,29 @@ class Language {
             else reqs[name] = [];
         }
         var chain = _(node, reqs[node], reqs);
-        return [...new Set(chain)].reverse();
+        return chain.filter((v, i) => chain.lastIndexOf(v) == i).reverse();
     }
 
+    _match(text, def, labelled) {
+        if (def instanceof Definition || def instanceof ListDefinition || def instanceof RegexDefinition) {
+            for (var name in labelled) {
+                console.log("z", text, name, labelled[name]);
+                if (name == def.name && text.endsWith(labelled[name][2])) return true;
+            }
+            return false;
+        }
+        switch (def.type) {
+            case 'string':
+                return text.endsWith(def.content[0])
+            case 'or':
+                break;
+            case 'default':
+
+                break;
+        }
+    }
     _label(text, name, labelled) {
+        console.log("label", text, name, labelled);
         function _(name, el){
             if (!(name in labelled)) {
                 labelled[name] = [];
@@ -269,15 +301,14 @@ class Language {
         }
         var def = this.definitions[name];
         if (def instanceof Definition) {
-            var possible = null;
-            def.definition.content.forEach(el => {
-                if (el == Context.Space) {
+            var tokenizer = new Tokenizer(text);
+
+            while (!tokenizer.empty()){
+                tokenizer.tell();
+                if (this._match(tokenizer.get(), def.definition.content[0], labelled)) {
+                    console.log("a", def.name, tokenizer.get(), tokenizer.cursor, labelled)
                 }
-                else if (el instanceof Context) {
-                }
-                else if (el instanceof Definition || el instanceof ListDefinition || el instanceof Reference) {
-                }
-            });
+            }
         }
         else if (def instanceof ListDefinition) {
             def.list.forEach(el => {
@@ -297,6 +328,7 @@ class Language {
             var node = this.topmost[i];
             if (node.type == "definition") {
                 var chain = this._create_chain(node.name);
+                console.log("chain", chain, node.name)
                 var labelled = {};
                 chain.forEach(x=>{
                     labelled = this._label(text, x, labelled);
