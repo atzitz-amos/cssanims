@@ -15,7 +15,7 @@ class Definition {
         this.definition = definition;
     }
     getAllReferences() {
-        return Definition._getAllReferences(this.definition);;
+        return Definition._getAllReferences(this.definition);
     }
 
     static _getAllReferences(ctx) {
@@ -26,7 +26,7 @@ class Definition {
                 result = result.concat(this._getAllReferences(el));
             }
             if (el instanceof Definition || el instanceof ListDefinition || el instanceof RegexDefinition) {
-                result.push(el);
+                result.push(el.name);
             }
         }
         return result;
@@ -161,7 +161,7 @@ class LanguageParser {
             ctx.add(part);
         }
 
-        var indexes = findAll(/\[|\]|\*|\+| |'/g, def)
+        var indexes = findAllRegex(/\[|\]|\*|\+| |'/g, def)
         _parse(undefined, indexes[0]);
         for (var i = 0; i < indexes.length; i++) {
             _parse(indexes[i], indexes[i + 1]);
@@ -244,27 +244,64 @@ class Language {
     }
 
     _create_chain(node) {
-        var chain = [node];
-        node.definition.content.forEach(x=>{
-            if (x instanceof Definition) {
-                x.getAllReferences().forEach(y=>{
-                    if (y instanceof Definition) chain = chain.concat(this._create_chain(y));
-                    else chain.push(y);
-                });
+        function _(name, r, arr) {
+            var result = [name];
+            r.forEach(x=>{
+                result = result.concat(_(x, arr[x], arr))
+            });
+            return result;
+        }
+        var reqs = {};
+        for (var name in this.definitions) {
+            if (this.definitions[name] instanceof Definition) reqs[name] = this.definitions[name].getAllReferences();
+            else reqs[name] = [];
+        }
+        var chain = _(node, reqs[node], reqs);
+        return [...new Set(chain)].reverse();
+    }
+
+    _label(text, name, labelled) {
+        function _(name, el){
+            if (!(name in labelled)) {
+                labelled[name] = [];
             }
-            else if (x instanceof ListDefinition || x instanceof RegexDefinition) {
-                chain.push([x]);
-            }
-        });
-        return [...new Set(chain)];
+            labelled[name].push(el)
+        }
+        var def = this.definitions[name];
+        if (def instanceof Definition) {
+            var possible = null;
+            def.definition.content.forEach(el => {
+                if (el == Context.Space) {
+                }
+                else if (el instanceof Context) {
+                }
+                else if (el instanceof Definition || el instanceof ListDefinition || el instanceof Reference) {
+                }
+            });
+        }
+        else if (def instanceof ListDefinition) {
+            def.list.forEach(el => {
+                findAll(el, text).forEach(occ => _(def.name, [occ, occ + el.length, el, def.name]))
+            });
+        }
+        else {
+            [...text.matchAll(new RegExp(def.regex, "g"))].forEach(x=>{
+                _(def.name, [x.index, x.index + x[0].length, x[0], def.name]);
+            });
+        }
+        return labelled;
     }
 
     label(text) {
         for (var i=0; i<this.topmost.length; i++) {
             var node = this.topmost[i];
             if (node.type == "definition") {
-                var chain = this._create_chain(node);
-                console.log(node, chain);
+                var chain = this._create_chain(node.name);
+                var labelled = {};
+                chain.forEach(x=>{
+                    labelled = this._label(text, x, labelled);
+                });
+                console.log("ds", node.name, labelled);
             }
         }
     }
