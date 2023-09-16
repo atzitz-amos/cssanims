@@ -5,10 +5,10 @@
 
 @font-face {
   font-family: JetBrains;
-  src: url(JetBrainsMono-Light.ttf);
+  src: url("../JetBrainsMono-Light.ttf");
 }
 
-.editor-inner, .sizer {font-family: 'JetBrains'; font-size: 15px;}
+.editor-inner, .sizer, .hl {font-family: 'JetBrains'; font-size: 16px; letter-spacing: 1px;}
 
 *{white-space: pre; tab-size: 4; caret-color: transparent; user-select: none;}
 

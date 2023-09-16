@@ -1,0 +1,28 @@
+
+[data-language="css"] .hl-selector-name {
+    color: #4c8f9e;
+}
+
+[data-language="css"] .hl-opening-bracket, [data-language="css"] .hl-closing-bracket {
+    color: #e0f3af;
+}
+
+[data-language="css"] .hl-number {
+    color: #6897bb;
+}
+
+[data-language="css"] .hl-keyframes-decorator {
+    color: #997fd7;
+}
+
+[data-language="css"] .hl-keyframes-name {
+    color: #55ca6d;
+}
+
+[data-language="css"] .hl-property-name {
+    color: #c5c04f;
+}
+
+[data-language="css"] .hl-variable-definition {
+    color: #d2556c;
+}

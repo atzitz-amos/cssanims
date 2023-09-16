@@ -34,3 +34,23 @@ Array.prototype.split = function (pattern) {
     }
     return result;
 }
+
+Array.prototype.first = function (cond) {
+    for (var i = 0; i < this.length; i++) {
+        if (cond(this[i])) return this[i];
+    }
+    return null;
+}
+
+filterObj = function (obj, cond) {
+    var result = {};
+    for (var el in obj) {
+        if(cond(obj[el])) result[el] = obj[el];
+    }
+    return result;
+}
+
+
+const escapeHTML = (unsafe) => {
+    return unsafe.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}

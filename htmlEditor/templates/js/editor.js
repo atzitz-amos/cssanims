@@ -451,6 +451,7 @@ writer = {
         else {
             cursor.setText(this.lines[this.currentline - 1].deleteChar(cursor.textPos - 1));
         }
+        eventDispatcher.dispatch("writer/change", this.lines[this.currentline - 1]);
     },
     deleteLine: function () {
         if(this.currentline == 1) return;
@@ -548,6 +549,12 @@ writer = {
             }
         }
         cursor.vertMovementPos = null;
+    },
+    text () {
+        return this.lines.map(x=>x.text()).join(" ");
+    },
+    setHTMLLinesContent (html) {
+
     }
 }
 

@@ -1,5 +1,13 @@
 
 
+class MatchFailure extends Error {
+    constructor() {
+        super();
+        this.name = "MatchFailure";
+    }
+}
+
+
 class RegexDefinition {
     type = "regex";
     constructor (name, regex) {
@@ -8,7 +16,38 @@ class RegexDefinition {
     }
 }
 
+
+class Node {
+    static START = "start";
+    static SPACING = "spacing";
+    static LITERAL = "literal";
+    static REGEX = "regex";
+    static LIST = "list";
+    static FORK = "fork";
+    static REJOIN = "rejoin";
+    static END = "end";
+
+
+    static _counter = 0;
+
+    constructor (type, content=null, parent=null, children=null) {
+        this.type = type;
+        this.content = content;
+        this.parent = parent;
+        this.children = children == null ? [] : children;
+        this.id = Node._counter++;
+
+        this.name = null;
+
+        if(parent != null && type != Node.REJOIN) {
+            parent.children.push(this);
+        }
+    }
+}
+
 class Definition {
+    static _nodes_cache = {};
+
     type = "definition";
     constructor (name, definition) {
         this.name = name;
@@ -16,6 +55,104 @@ class Definition {
     }
     getAllReferences() {
         return Definition._getAllReferences(this.definition);
+    }
+    static _create_nodes(def, parent=null, name=null) {
+        var nd = (parent == null ? new Node(Node.START, [name]): parent);
+        var start = nd;
+        var rejoin = null;
+        if (nd.type == Node.REJOIN) {
+            rejoin = nd.content;
+            nd = nd.parent;
+        }
+        if (def instanceof Context) {
+            switch(def.type) {
+                case "string":
+                    if (def.content[0].length > 1) {
+                        for (var el of def.content[0].split("")) {
+                            nd = this._create_nodes(new Context(Context.STRING, el), nd, name);
+                        }
+                    }
+                    else {
+                        nd = new Node(Node.LITERAL, def.content[0], nd);
+                    }
+                    break;
+                case "or":
+                    nd = new Node(Node.FORK, null, nd);
+                    var nd_list = [];
+                    for (var i = 0; i < def.content.length; i++) {
+                        nd_list.push(this._create_nodes(def.content[i], nd, name));
+                    }
+                    nd = new Node(Node.REJOIN, nd_list, nd);
+                    break;
+                case "optional":
+                    var nd = new Node(Node.FORK, null, nd);
+                    var new_nd = nd;
+                    for (var i = 0; i < def.content.length; i++) {
+                        new_nd = this._create_nodes(def.content[i], new_nd, name)
+                    }
+                    nd = new Node(Node.REJOIN, [new_nd], nd);
+                    break;
+                case "default":
+                    for (var i = 0; i < def.content.length; i++) {
+                        nd = this._create_nodes(def.content[i], nd, name)
+                    }
+                    break;
+            }
+        }
+        else if (def instanceof Definition) {
+            nd = new Node(Node.START, [def.name], nd);
+            nd = this._create_nodes(def.definition, nd, def.name);
+            if (nd.type == Node.REJOIN) {
+                rejoin = nd.content;
+                nd = null;
+            }
+            nd = new Node(Node.END, [def.name], nd);
+            name = null;
+        }
+        else if (def instanceof ListDefinition) {
+            nd = new Node(Node.START, [def.name], nd);
+            nd = new Node(Node.LIST, def.list, nd);
+            if (nd.type == Node.REJOIN) {
+                rejoin = nd.content;
+                nd = null;
+            }
+            nd.name = def.name;
+            nd = new Node(Node.END, [def.name], nd);
+            name = null;
+        }
+        else if (def instanceof RegexDefinition) {
+            nd = new Node(Node.START, [def.name], nd);
+            nd = new Node(Node.REGEX, def.regex, nd);
+            if (nd.type == Node.REJOIN) {
+                rejoin = nd.content;
+                nd = null;
+            }
+            nd.name = def.name;
+            nd = new Node(Node.END, [def.name], nd);
+            name = null;
+        }
+
+        else if (def == Context.Space) {nd = new Node(Node.SPACING, null, nd);}
+
+        if (def.mod_multiple) {
+            nd = new Node(Node.FORK, null, nd, [start.children[0]])
+        }
+
+        if (rejoin) {
+            rejoin.forEach(r=>r.children.push(nd));
+        }
+
+        if (name) {
+            nd.name = name;
+        }
+
+        return parent == null ? start : nd;
+    }
+
+    static create_nodes(def, name) {
+        if (!(name in this._nodes_cache)) this._nodes_cache[name] = this._create_nodes(def instanceof Definition ? def.definition : def, null, name);
+        this._nodes_cache[name].name = name;
+        return this._nodes_cache[name];
     }
 
     static _getAllReferences(ctx) {
@@ -83,29 +220,35 @@ class Context {
 class LanguageParser {
     static load(defs) {
         var defs = this.preload(defs);
-        for (name in defs) {
+        for (name in filterObj(defs, x=>x instanceof Definition)) {
             var def = defs[name];
-            if (def instanceof Definition) {
-                this._create_refs(def.definition, defs);
-            }
+            this._create_refs(def.definition, defs);
+        }
+        for (name in filterObj(defs, x=>x instanceof Definition)) {
+            var def = defs[name];
         }
         return defs;
     }
     static preload (defs) {
         var result = {};
-        for (var defname in defs) {
-            var def = defs[defname];
+        for (var i = 0; i < defs.length; i++) {
+            var def = defs[i];
+            var defname = def.name;
             if (def.regex != undefined) {
                 result[defname] = new RegexDefinition(defname, def.regex);
             }
             else if (def.definition != undefined) {
-                var def = this.parseDef(def.definition);
-                result[defname] = new Definition(defname, def.content.includes("|") ? this.parseOr(def) : def);
+                var _def = this.parseDef(def.definition);
+                if (def.definition.includes("|")) {
+                    _def = this.parseOrMultiple(_def)
+                }
+                result[defname] = new Definition(defname, _def);
             }
             else if (def.list != undefined) {
                 result[defname] = new ListDefinition(defname, def.list);
             }
             result[defname].refcount = 0;
+            result[defname].priority = i;
         }
         return result;
     }
@@ -176,7 +319,9 @@ class LanguageParser {
         return ctx;
     }
     static _ref(element, defs) {
-        if (!(element in defs)) {throw new Error(`Cannot create reference for element '${element}' because it's not defined`);}
+        if (!(element in defs)) {
+            throw new Error(`Cannot create reference for element '${element}' because it's not defined`);
+        }
         defs[element].refcount++;
         return defs[element];
     }
@@ -191,9 +336,20 @@ class LanguageParser {
             }
         }
     }
+    static parseOrMultiple(ctx) {
+        for (var i = 0; i < ctx.content.length; i++) {
+            if (ctx.content.includes("|")) {
+                ctx = this.parseOr(ctx);
+            }
+            if (ctx.content[i] instanceof Context && ctx.content[i].type == "optional") {
+                ctx.content[i] = this.parseOrMultiple(ctx.content[i]);
+            }
+        }
+        return ctx;
+    }
     static parseOr(ctx) {
         function _(e) {
-            if (e instanceof Context && e.type == Context.OPTIONAL) {return this.parseOr(e);}
+            if (e instanceof Context && (e.type == Context.OPTIONAL)) {return this.parseOr(e);}
             return e;
         }
 
@@ -219,7 +375,7 @@ class LanguageParser {
 }
 
 async function _load(name) {
-    var definition = await fetch("http://localhost:63342/cssanims2/htmlEditor/templates/langs/lang-"+name+".json")
+    var definition = await fetch("http://localhost:63342/cssanims/htmlEditor/templates/langs/lang-"+name+".json")
         .then(x=>x.json())
         .then(lang=>{
             return new Language(name, LanguageParser.load(lang.definitions));
@@ -231,120 +387,209 @@ async function _load(name) {
 class Tokenizer {
     constructor (text) {
         this.text = text;
-        this.cursor = -1;
-        this.checkpoint = 0;
+        this.cursor = 0;
+        this._checkpoint = 0;
+        this._firstcheckpoint = 0;
     }
     seek () {return this.text.charAt(this.cursor+1)}
-    checkpoint () {this.checkpoint = this.cursor;}
-    get () {return this.text.substring(this.checkpoint, this.cursor);}
+    checkpoint (value=null) {this._checkpoint = value == null ?  this.cursor : value;}
+    get () {return this.text.substring(this._checkpoint);}
+    current () {return this.text.charAt(this.cursor-1)}
     tell () {return this.text.charAt(this.cursor++);}
     empty () {return this.cursor == this.text.length}
+    since () {return this.text.substring(this._checkpoint, this.cursor)}
+    reset () {this.cursor = -1; this._checkpoint = 0; this._firstcheckpoint = 0;}
+    startsWith (str) {return this.since().startsWith(str)}
+    getCursor (start) {return this.cursor > this.text.length ? -1 : this.cursor - 1 + start}
 }
 
 class Language {
     constructor(name, defs) {
         this.name = name;
         this.definitions = defs;
-        this.def_list = [];
-        this.topmost = [];
+        this.def_list = new Array(Object.keys(defs).length);
         for (var el in defs) {
-            this.def_list.push(defs[el]);
-            if (defs[el].refcount==0) this.topmost.push(defs[el]);
+            this.def_list[defs[el].priority]= defs[el];
         }
+        this.topmost = this.def_list.filter(x=>x.refcount == 0);
+
+        this._cache = {};
     }
     toString() {
         return `<Language '${this.name}' definitions=${this.definitions}>`;
     }
 
-    _create_chain(node) {
-        function _(name, r, arr) {
-            var result = [name];
-            r.forEach(x=>{
-                result = result.concat(_(x, arr[x], arr));
-            });
-            return result;
-        }
-        var reqs = {};
-        for (var name in this.definitions) {
-            if (this.definitions[name] instanceof Definition) reqs[name] = this.definitions[name].getAllReferences();
-            else reqs[name] = [];
-        }
-        var chain = _(node, reqs[node], reqs);
-        return chain.filter((v, i) => chain.lastIndexOf(v) == i).reverse();
-    }
+    _label(text, node, index_start=0, name=null, starts=null) {
+        var new_labelled = [];
+        var current = node;
+        var tokens = new Tokenizer(text);
+        tokens.tell();
 
-    _match(text, def, labelled) {
-        if (def instanceof Definition || def instanceof ListDefinition || def instanceof RegexDefinition) {
-            for (var name in labelled) {
-                console.log("z", text, name, labelled[name]);
-                if (name == def.name && text.endsWith(labelled[name][2])) return true;
-            }
-            return false;
-        }
-        switch (def.type) {
-            case 'string':
-                return text.endsWith(def.content[0])
-            case 'or':
-                break;
-            case 'default':
+        //console.group(current.name);
+        const ID = node.id;
+        name = name == null ? node.name : name;
+        starts = starts == null ? {} : starts;
 
-                break;
-        }
-    }
-    _label(text, name, labelled) {
-        console.log("label", text, name, labelled);
-        function _(name, el){
-            if (!(name in labelled)) {
-                labelled[name] = [];
-            }
-            labelled[name].push(el)
-        }
-        var def = this.definitions[name];
-        if (def instanceof Definition) {
-            var tokenizer = new Tokenizer(text);
+        if (this._cache[[text, ID, index_start]] != undefined) return this._cache[[text, ID, index_start]];
 
-            while (!tokenizer.empty()){
-                tokenizer.tell();
-                if (this._match(tokenizer.get(), def.definition.content[0], labelled)) {
-                    console.log("a", def.name, tokenizer.get(), tokenizer.cursor, labelled)
+        try {
+            while (true) {
+                if (!current) {
+                    break;
+                }
+                switch (current.type) {
+                    case Node.START:
+                        starts[current.content[0]] = index_start + tokens._checkpoint;
+                        current = current.children[0];
+                        break;
+                    case Node.LITERAL:
+                        if (!tokens.startsWith(current.content[0])) {
+                            throw new MatchFailure();
+                        }
+                        tokens.checkpoint();
+                        tokens.cursor += current.content[0].length;
+                        current = current.children[0];
+                        break;
+                    case Node.SPACING:
+                        while (tokens.current() == " ") {
+                            tokens.checkpoint();
+                            tokens.tell();
+                        }
+                        current = current.children[0];
+                        break;
+                    case Node.REGEX:
+                        var result;
+                        if ((result = tokens.get().match("^" + current.content)) != null) {
+                            tokens.cursor = tokens._checkpoint + result.index + result[0].length;
+                            tokens.checkpoint();
+                            tokens.tell();
+                            current = current.children[0];
+                            break;
+                        }
+                        throw new MatchFailure();
+                    case Node.FORK:
+                        if (tokens.getCursor(index_start) == -1) throw new MatchFailure();
+
+                        for (var i = 0; i < current.children.length; i++) {
+                            if (current.children[i].type == Node.END) continue;
+                            var [labels, index, isMatch] = this._label(tokens.get(), current.children[i], tokens.getCursor(index_start), name, JSON.parse(JSON.stringify(starts)));
+                            if (isMatch) {
+                                // new_labelled.push([starts[name], index, name])
+                                // console.groupEnd();
+                                this._cache[[text, ID, index_start]] = [new_labelled.concat(labels), index, true];
+                                return [new_labelled.concat(labels), index, true];
+                            }
+                        }
+                        throw new MatchFailure();
+                    case Node.LIST:
+                        var noMatch = true;
+                        for (var lit of current.content) {
+                            if (tokens.startsWith(lit)) {
+                                noMatch = false;
+                                tokens.checkpoint();
+                                tokens.cursor += lit.length;
+                                current = current.children[0];
+                                break;
+                            }
+                        }
+                        if (noMatch) throw new MatchFailure();
+                        break;
+                    case Node.END:
+                        var s = starts[current.content[0]], c = current.content[0];
+                        new_labelled.push([s, tokens.getCursor(index_start), current.content[0]]);
+                        current = current.children[0];
+                        if (c == name && !current) {
+                            // console.groupEnd();
+                            this._cache[[text, ID, index_start]] = [new_labelled, tokens.getCursor(index_start), true];
+                            return [new_labelled, tokens.getCursor(index_start), true];
+                        }
+                        break;
                 }
             }
+        } catch (e) {
+            if (e instanceof MatchFailure) {
+                // console.debug("MatchFailure for node", name, "on text", "'"+text+"'");
+                // console.groupEnd();
+                this._cache[[text, ID, index_start]] = [new_labelled, tokens.getCursor(index_start), false];
+                return [new_labelled, tokens.getCursor(index_start), false];
+            }
+            throw e;
         }
-        else if (def instanceof ListDefinition) {
-            def.list.forEach(el => {
-                findAll(el, text).forEach(occ => _(def.name, [occ, occ + el.length, el, def.name]))
-            });
-        }
-        else {
-            [...text.matchAll(new RegExp(def.regex, "g"))].forEach(x=>{
-                _(def.name, [x.index, x.index + x[0].length, x[0], def.name]);
-            });
-        }
-        return labelled;
+        // console.groupEnd();
+        new_labelled.push([starts[name], tokens.getCursor(index_start), name]);
+        this._cache[[text, ID, index_start]] = [new_labelled, tokens.getCursor(index_start), true];
+        return [new_labelled, tokens.getCursor(index_start), true];
     }
 
-    label(text) {
-        for (var i=0; i<this.topmost.length; i++) {
-            var node = this.topmost[i];
-            if (node.type == "definition") {
-                var chain = this._create_chain(node.name);
-                console.log("chain", chain, node.name)
-                var labelled = {};
-                chain.forEach(x=>{
-                    labelled = this._label(text, x, labelled);
-                });
-                console.log("ds", node.name, labelled);
+    async label(text) {
+       var labelled = [];
+       // console.group(text);
+       var ind = 0;
+       var start_ind = 0;
+       var last_ind = 0;
+       try {
+           while (ind < text.length) {
+                for(var def of this.topmost) {
+                   var [new_labelled, index, isMatch] = this._label(text.substring(ind), Definition.create_nodes(def, def.name), last_ind);
+                   if (isMatch) {
+                       labelled = labelled.concat(new_labelled);
+                       if (index == -1) {
+                           throw new Error();
+                       }
+                       ind = index;
+                       last_ind = ind;
+                   }
+                }
+                if (ind == start_ind) {
+                    ind++;
+                    last_ind++;
+                }
+                start_ind = ind;
+           }
+       } catch (e) {}
+       // console.groupEnd();
+       return labelled;
+    }
+
+    async generateSpans(txt) {
+        var x = await this.label(txt);
+
+        var result = [],
+        spans = [];
+
+        for (var lb of x) {
+            for (let i = lb[0]; lb[0] <= i && i < (lb[1] == -1 ? txt.length : lb[1]); i++) {
+                if (result[i] == undefined) result[i] = [];
+                result[i].push(lb[2]);
             }
         }
-    }
-    identifyDefinition (text, definition) {
 
-    }
-    identifyList (text, list) {
+        for (var i = result.length; i < txt.length; i++) {
+            result[i] = undefined;
+        }
 
-    }
-    identifyRegex (text, regex) {
+        function _(i, l) {
+            if (i != 0 && ((l[0] == "plain-text" && result[i-1] == undefined) || JSON.stringify(result[i-1]) == JSON.stringify(l))) {
+                spans[spans.length-1][0] += txt[i];
+            }
+            else {
+                spans.push([txt[i], l]);
+            }
+        }
 
+        for (let i = 0; i < result.length; i++) {
+            if (result[i] == undefined) {
+                _(i, ["plain-text"]);
+            }
+            else {
+                _(i, result[i]);
+            }
+        }
+
+        if (!spans.length) {
+            spans.push([txt, "plain-text"]);
+        }
+        return spans;
     }
 
     static _loaded = {};

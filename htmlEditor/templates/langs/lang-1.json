@@ -1,0 +1,21 @@
+
+{
+  "definitions": [
+    {
+      "definition": "'-'a",
+      "name": "number"
+    },
+    {
+      "definition": "x | y",
+      "name": "a"
+    },
+    {
+      "regex": "x",
+      "name": "x"
+    },
+    {
+      "regex": "y",
+      "name": "y"
+    }
+  ]
+}
