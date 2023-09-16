@@ -6,8 +6,8 @@ async function highlight (lang, line) {
     var spans = await lang.generateSpans(txt);
     try {
         var text = spans.map(s=>`<span class="hl ${s[1].map(tag=>'hl-'+tag).join(' ')}">${escapeHTML(s[0])}</span>`).join("");
+        line.element.innerHTML = text;
     } catch (e) {}
-    line.element.innerHTML = text;
 }
 
 
