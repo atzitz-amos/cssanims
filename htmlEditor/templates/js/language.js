@@ -25,6 +25,7 @@ class Node {
     static LIST = "list";
     static FORK = "fork";
     static REJOIN = "rejoin";
+    static TBR = "toBeReplaced";
     static END = "end";
 
 
@@ -47,6 +48,7 @@ class Node {
 
 class Definition {
     static _nodes_cache = {};
+    static _nodes_recursive_cache = [];
 
     type = "definition";
     constructor (name, definition) {
@@ -55,6 +57,15 @@ class Definition {
     }
     getAllReferences() {
         return Definition._getAllReferences(this.definition);
+    }
+    static _replace_tbr(node, first_node, last_node) {
+        for (let i = 0; i < node.children.length; i++) {
+            if (node.children[i].type == Node.TBR) {
+                children = node.children[i].children;
+                node.children[i] = first_node;
+                last_node.children = last_node.children.concat(children);
+            }
+        }
     }
     static _create_nodes(def, parent=null, name=null) {
         var nd = (parent == null ? new Node(Node.START, [name]): parent);
@@ -90,6 +101,9 @@ class Definition {
                     for (var i = 0; i < def.content.length; i++) {
                         new_nd = this._create_nodes(def.content[i], new_nd, name)
                     }
+                    if (def.mod_multiple) {
+                        new_nd = new Node(Node.FORK, null, new_nd, [nd])
+                    }
                     nd = new Node(Node.REJOIN, [new_nd], nd);
                     break;
                 case "default":
@@ -100,17 +114,26 @@ class Definition {
             }
         }
         else if (def instanceof Definition) {
-            nd = new Node(Node.START, [def.name], nd);
-            nd = this._create_nodes(def.definition, nd, def.name);
-            if (nd.type == Node.REJOIN) {
-                rejoin = nd.content;
-                nd = null;
+            if (this._nodes_recursive_cache.includes(def.name)) {
+                nd = new Node(Node.TBR, null, nd)
+            } else {
+                this._nodes_recursive_cache.push(def.name);
+
+                var last_nd = new Node(Node.START, [def.name], nd);
+                last_nd.options = def.options;
+                nd = this._create_nodes(def.definition, last_nd, def.name);
+                // nd = this._replace_tbr(nd, last_nd, nd);
+                if (nd.type == Node.REJOIN) {
+                    rejoin = nd.content;
+                    nd = null;
+                }
+                nd = new Node(Node.END, [def.name], nd);
+                name = null;
             }
-            nd = new Node(Node.END, [def.name], nd);
-            name = null;
         }
         else if (def instanceof ListDefinition) {
             nd = new Node(Node.START, [def.name], nd);
+            nd.options = def.options;
             nd = new Node(Node.LIST, def.list, nd);
             if (nd.type == Node.REJOIN) {
                 rejoin = nd.content;
@@ -122,6 +145,7 @@ class Definition {
         }
         else if (def instanceof RegexDefinition) {
             nd = new Node(Node.START, [def.name], nd);
+            nd.options = def.options;
             nd = new Node(Node.REGEX, def.regex, nd);
             if (nd.type == Node.REJOIN) {
                 rejoin = nd.content;
@@ -134,10 +158,6 @@ class Definition {
 
         else if (def == Context.Space) {nd = new Node(Node.SPACING, null, nd);}
 
-        if (def.mod_multiple) {
-            nd = new Node(Node.FORK, null, nd, [start.children[0]])
-        }
-
         if (rejoin) {
             rejoin.forEach(r=>r.children.push(nd));
         }
@@ -145,12 +165,19 @@ class Definition {
         if (name) {
             nd.name = name;
         }
-
+        if (parent == null && nd.type == Node.REJOIN) {
+            nd.content.forEach(r=>r.children.push(undefined));
+            nd.parent.children.push(undefined);
+        }
         return parent == null ? start : nd;
     }
 
     static create_nodes(def, name) {
-        if (!(name in this._nodes_cache)) this._nodes_cache[name] = this._create_nodes(def instanceof Definition ? def.definition : def, null, name);
+        if (!(name in this._nodes_cache)) {
+            this._nodes_cache[name] = this._create_nodes(def instanceof Definition ? def.definition : def, null, name);
+            this._nodes_cache[name].options = def.options;
+        }
+        this._nodes_recursive_cache = [];
         this._nodes_cache[name].name = name;
         return this._nodes_cache[name];
     }
@@ -249,6 +276,12 @@ class LanguageParser {
             }
             result[defname].refcount = 0;
             result[defname].priority = i;
+            result[defname].options = {};
+            for (var el in def) {
+                if (!(["definition", "regex", "list", "name"].includes(el))) {
+                    result[defname].options[el] = def[el];
+                }
+            }
         }
         return result;
     }
@@ -414,12 +447,13 @@ class Language {
         this.topmost = this.def_list.filter(x=>x.refcount == 0);
 
         this._cache = {};
+        this._cache_spans = {};
     }
     toString() {
         return `<Language '${this.name}' definitions=${this.definitions}>`;
     }
 
-    _label(text, node, index_start=0, name=null, starts=null) {
+    _label(text, node, index_start=0, name=null, starts=null, s_opts=null) {
         var new_labelled = [];
         var current = node;
         var tokens = new Tokenizer(text);
@@ -429,10 +463,11 @@ class Language {
         const ID = node.id;
         name = name == null ? node.name : name;
         starts = starts == null ? {} : starts;
+        s_opts = s_opts == null ? {} : s_opts;
 
         if (this._cache[[text, ID, index_start]] != undefined) return this._cache[[text, ID, index_start]];
 
-        try {
+        main: {try {
             while (true) {
                 if (!current) {
                     break;
@@ -440,6 +475,7 @@ class Language {
                 switch (current.type) {
                     case Node.START:
                         starts[current.content[0]] = index_start + tokens._checkpoint;
+                        s_opts[current.content[0]] = current.options;
                         current = current.children[0];
                         break;
                     case Node.LITERAL:
@@ -468,11 +504,17 @@ class Language {
                         }
                         throw new MatchFailure();
                     case Node.FORK:
-                        if (tokens.getCursor(index_start) == -1) throw new MatchFailure();
+                        if (tokens.getCursor(index_start) == -1) {
+                            if (!current.children.includes(undefined)) throw new MatchFailure();
+                            current = undefined;
+                            break;
+                        }
 
                         for (var i = 0; i < current.children.length; i++) {
-                            if (current.children[i].type == Node.END) continue;
-                            var [labels, index, isMatch] = this._label(tokens.get(), current.children[i], tokens.getCursor(index_start), name, JSON.parse(JSON.stringify(starts)));
+                            if (current.children[i] == undefined) {
+                                break main;
+                            }
+                            var [labels, index, isMatch] = this._label(tokens.get(), current.children[i], tokens.getCursor(index_start), name, JSON.parse(JSON.stringify(starts)), JSON.parse(JSON.stringify(s_opts)));
                             if (isMatch) {
                                 // new_labelled.push([starts[name], index, name])
                                 // console.groupEnd();
@@ -496,7 +538,7 @@ class Language {
                         break;
                     case Node.END:
                         var s = starts[current.content[0]], c = current.content[0];
-                        new_labelled.push([s, tokens.getCursor(index_start), current.content[0]]);
+                        new_labelled.push([s, tokens.getCursor(index_start), current.content[0], s_opts[c]]);
                         current = current.children[0];
                         if (c == name && !current) {
                             // console.groupEnd();
@@ -507,16 +549,16 @@ class Language {
                 }
             }
         } catch (e) {
-            if (e instanceof MatchFailure) {
+            if (e.name == "MatchFailure") {
                 // console.debug("MatchFailure for node", name, "on text", "'"+text+"'");
                 // console.groupEnd();
                 this._cache[[text, ID, index_start]] = [new_labelled, tokens.getCursor(index_start), false];
                 return [new_labelled, tokens.getCursor(index_start), false];
             }
             throw e;
-        }
+        }}
         // console.groupEnd();
-        new_labelled.push([starts[name], tokens.getCursor(index_start), name]);
+        new_labelled.push([starts[name], tokens.getCursor(index_start), name, s_opts[name]]);
         this._cache[[text, ID, index_start]] = [new_labelled, tokens.getCursor(index_start), true];
         return [new_labelled, tokens.getCursor(index_start), true];
     }
@@ -554,42 +596,50 @@ class Language {
     async generateSpans(txt) {
         var x = await this.label(txt);
 
-        var result = [],
-        spans = [];
+        if (!(txt in this._cache_spans)) {
 
-        for (var lb of x) {
-            for (let i = lb[0]; lb[0] <= i && i < (lb[1] == -1 ? txt.length : lb[1]); i++) {
-                if (result[i] == undefined) result[i] = [];
-                result[i].push(lb[2]);
-            }
-        }
+            var result = [],
+                opts = [],
+                spans = [];
 
-        for (var i = result.length; i < txt.length; i++) {
-            result[i] = undefined;
-        }
+            for (var lb of x) {
+                for (let i = lb[0]; lb[0] <= i && i < (lb[1] == -1 ? txt.length : lb[1]); i++) {
+                    if (result[i] == undefined) result[i] = [];
+                    if (opts[i] == undefined) opts[i] = {};
+                    result[i].push(lb[2]);
+                    opts[i] = {...opts[i], ...lb[3]}
+                }
+            }
 
-        function _(i, l) {
-            if (i != 0 && ((l[0] == "plain-text" && result[i-1] == undefined) || JSON.stringify(result[i-1]) == JSON.stringify(l))) {
-                spans[spans.length-1][0] += txt[i];
+            for (var i = result.length; i < txt.length; i++) {
+                result[i] = undefined;
             }
-            else {
-                spans.push([txt[i], l]);
-            }
-        }
 
-        for (let i = 0; i < result.length; i++) {
-            if (result[i] == undefined) {
-                _(i, ["plain-text"]);
+            function _(i, l) {
+                if ((opts[i] == undefined || !opts[i]['single']) && i != 0 && ((l[0] == "plain-text" && result[i-1] == undefined) || JSON.stringify(result[i-1]) == JSON.stringify(l))) {
+                    spans[spans.length-1][0] += txt[i];
+                }
+                else {
+                    spans.push([txt[i], l, opts[i] || {}]);
+                }
             }
-            else {
-                _(i, result[i]);
-            }
-        }
 
-        if (!spans.length) {
-            spans.push([txt, "plain-text"]);
+            for (let i = 0; i < result.length; i++) {
+                if (result[i] == undefined) {
+                    _(i, ["plain-text"]);
+                }
+                else {
+                    _(i, result[i]);
+                }
+            }
+
+            if (!spans.length) {
+                spans.push([txt, "plain-text"]);
+            }
+
+            this._cache_spans[txt] = spans;
         }
-        return spans;
+        return this._cache_spans[txt];
     }
 
     static _loaded = {};
@@ -597,5 +647,8 @@ class Language {
         if (lang in this._loaded) return this._loaded[lang];
         this._loaded[lang] = await _load(lang);
         return this._loaded[lang];
+    }
+    static async current () {
+        return await this.fromLang("1");  // TODO
     }
 }

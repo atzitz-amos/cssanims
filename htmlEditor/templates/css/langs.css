@@ -26,3 +26,11 @@
 [data-language="css"] .hl-variable-definition {
     color: #d2556c;
 }
+
+[data-language="css"] .hl-string {
+    color: #ff9d15;
+}
+
+[data-language="css"] .hl-function-name {
+    color: #663fa3;
+}

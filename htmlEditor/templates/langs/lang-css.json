@@ -14,22 +14,21 @@
     },
     {
       "list": ["{", "["],
-      "name": "opening-bracket"
+      "name": "opening-bracket",
+      "single":  true
     },
     {
       "list": ["}", "]"],
-      "name": "closing-bracket"
+      "name": "closing-bracket",
+      "single": true
     },
     {
       "definition": "'--'selector-name",
       "name": "variable-definition"
     },
     {
-      "regex": "[0-9]+",
-      "name": "number"
-    },
-    {
-      "definition": "keyframes-decorator keyframes-name"
+      "definition": "keyframes-decorator keyframes-name",
+      "name": "keyframes-definition"
     },
     {
       "definition": "'@keyframes'",
@@ -40,16 +39,54 @@
       "name": "keyframes-name"
     },
     {
-      "definition": "property-name ':' property-value ';'",
+      "definition": "property-name ':' property-value",
       "name": "property-definition"
     },
     {
       "definition": "selector-name | variable-definition",
       "name": "property-name"
     },
+
     {
-      "definition": "number",
+      "regex": "[0-9]+",
+      "name": "number"
+    },
+    {
+      "definition": "single-quote-string | double-quote-string",
+      "name": "string"
+    },
+    {
+      "regex": "'[^']*'",
+      "name": "single-quote-string"
+    },
+    {
+      "regex": "\"[^\"]*\"",
+      "name": "double-quote-string"
+    },
+    {
+      "definition": "function-name '(' [function-params] ')'",
+      "name": "function-call"
+    },
+    {
+      "definition": "selector-name",
+      "name": "function-name"
+    },
+    {
+      "definition": "function-param [ ',' function-param]+ ",
+      "name": "function-params"
+    },
+    {
+      "definition": "value",
+      "name": "function-param",
+      "single": true
+    },
+    {
+      "definition": "value",
       "name": "property-value"
+    },
+    {
+      "definition": "string | number",
+      "name": "value"
     }
   ]
 }

@@ -1,7 +1,8 @@
 
 
-async function highlight (lang, line) {
+async function highlight (line) {
     const txt = line.text();
+    const lang = await Language.current();
 
     var spans = await lang.generateSpans(txt);
     try {
@@ -11,8 +12,7 @@ async function highlight (lang, line) {
 }
 
 
-eventDispatcher.listen("writer/change", async function (line) {
+eventDispatcher.listen("writer/change", function (line) {
     if (line == undefined) return;
-    var lang = await Language.fromLang("css");  // TODO: change to tab language
-    await highlight(lang, line);
+    highlight(line);
 });

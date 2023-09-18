@@ -2,20 +2,20 @@
 {
   "definitions": [
     {
-      "definition": "'-'a",
-      "name": "number"
+      "definition": "a",
+      "name": "main"
     },
     {
-      "definition": "x | y",
+      "definition": "c",
       "name": "a"
     },
     {
-      "regex": "x",
-      "name": "x"
+      "regex": "b",
+      "name": "b"
     },
     {
-      "regex": "y",
-      "name": "y"
+      "definition": "a | b",
+      "name": "c"
     }
   ]
 }
