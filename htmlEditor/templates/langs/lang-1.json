@@ -2,20 +2,16 @@
 {
   "definitions": [
     {
-      "definition": "a",
-      "name": "main"
+      "definition": "func",
+      "name": "statement"
     },
     {
-      "definition": "c",
-      "name": "a"
+      "definition": "'func(' value ')'",
+      "name": "func"
     },
     {
-      "regex": "b",
-      "name": "b"
-    },
-    {
-      "definition": "a | b",
-      "name": "c"
+      "definition": "'1' | func",
+      "name": "value"
     }
   ]
 }

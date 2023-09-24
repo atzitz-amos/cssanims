@@ -47,12 +47,12 @@ eventDispatcher = {
             args.slice(0, -1).forEach(ev=>this.listen(ev, args[args.length - 1]));
         }
         else {
+            var lindex = event.lastIndexOf("!");
+            var priority = lindex == -1 ? 0 : event.slice(event.indexOf("!"), lindex+1).length
+            event = lindex == -1 ? event : event.slice(0, lindex - priority+1);
             if (!(event in this.eventListeners)) {
                 this.eventListeners[event] = [];
             }
-            var lindex = event.lastIndexOf("!");
-            var priority = lindex == -1 ? 0 : event.slice(event.indexOf("!"), lindex+1).length
-            event = lindex == -1 ? event : event.slice(0, lindex-1)
             this.eventListeners[event].push([priority, func]);
         }
     },

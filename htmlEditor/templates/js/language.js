@@ -19,6 +19,7 @@ class RegexDefinition {
 
 class Node {
     static START = "start";
+    static START_INDENT = "start_indent";
     static SPACING = "spacing";
     static LITERAL = "literal";
     static REGEX = "regex";
@@ -26,6 +27,7 @@ class Node {
     static FORK = "fork";
     static REJOIN = "rejoin";
     static TBR = "toBeReplaced";
+    static END_INDENT = "end_indent";
     static END = "end";
 
 
@@ -48,7 +50,7 @@ class Node {
 
 class Definition {
     static _nodes_cache = {};
-    static _nodes_recursive_cache = [];
+    static _nodes_recursive_cache = {};
 
     type = "definition";
     constructor (name, definition) {
@@ -58,14 +60,19 @@ class Definition {
     getAllReferences() {
         return Definition._getAllReferences(this.definition);
     }
-    static _replace_tbr(node, first_node, last_node) {
-        for (let i = 0; i < node.children.length; i++) {
+    static _replace_tbr(node) {
+        for (var i=0; i < node.children.length; i++) {
             if (node.children[i].type == Node.TBR) {
-                children = node.children[i].children;
-                node.children[i] = first_node;
-                last_node.children = last_node.children.concat(children);
+                var name = node.children[i].content[0];
+                var start_node = new Node(Node.START_INDENT, [name], null);
+                start_node.parent = nd;
+                
+
+                node.children[i] = this._nodes_recursive_cache[name];
             }
+            else node.children[i] = this._replace_tbr(node.children[i]);
         }
+        return node;
     }
     static _create_nodes(def, parent=null, name=null) {
         var nd = (parent == null ? new Node(Node.START, [name]): parent);
@@ -114,22 +121,34 @@ class Definition {
             }
         }
         else if (def instanceof Definition) {
-            if (this._nodes_recursive_cache.includes(def.name)) {
-                nd = new Node(Node.TBR, null, nd)
+            /*if (def.name in this._nodes_recursive_cache) {
+                nd = new Node(Node.TBR, [def.name], nd);
             } else {
-                this._nodes_recursive_cache.push(def.name);
-
                 var last_nd = new Node(Node.START, [def.name], nd);
                 last_nd.options = def.options;
+                this._nodes_recursive_cache[def.name] = last_nd;
+
                 nd = this._create_nodes(def.definition, last_nd, def.name);
-                // nd = this._replace_tbr(nd, last_nd, nd);
+
+
                 if (nd.type == Node.REJOIN) {
                     rejoin = nd.content;
                     nd = null;
                 }
                 nd = new Node(Node.END, [def.name], nd);
                 name = null;
+            }*/
+            var last_nd = new Node(Node.START, [def.name], nd);
+            last_nd.options = def.options;
+
+            nd = this._create_nodes(def.definition, last_nd, def.name);
+
+            if (nd.type == Node.REJOIN) {
+                rejoin = nd.content;
+                nd = null;
             }
+            nd = new Node(Node.END, [def.name], nd);
+            name = null;
         }
         else if (def instanceof ListDefinition) {
             nd = new Node(Node.START, [def.name], nd);
@@ -174,8 +193,12 @@ class Definition {
 
     static create_nodes(def, name) {
         if (!(name in this._nodes_cache)) {
-            this._nodes_cache[name] = this._create_nodes(def instanceof Definition ? def.definition : def, null, name);
+            var node = this._create_nodes(def instanceof Definition ? def.definition : def, null, name);
+            // this._replace_tbr(node);
+
+            this._nodes_cache[name] = node;
             this._nodes_cache[name].options = def.options;
+
         }
         this._nodes_recursive_cache = [];
         this._nodes_cache[name].name = name;
@@ -430,7 +453,7 @@ class Tokenizer {
     current () {return this.text.charAt(this.cursor-1)}
     tell () {return this.text.charAt(this.cursor++);}
     empty () {return this.cursor == this.text.length}
-    since () {return this.text.substring(this._checkpoint, this.cursor)}
+    since () {return this.text.substring(this._checkpoint)}
     reset () {this.cursor = -1; this._checkpoint = 0; this._firstcheckpoint = 0;}
     startsWith (str) {return this.since().startsWith(str)}
     getCursor (start) {return this.cursor > this.text.length ? -1 : this.cursor - 1 + start}
@@ -649,6 +672,6 @@ class Language {
         return this._loaded[lang];
     }
     static async current () {
-        return await this.fromLang("1");  // TODO
+        return await this.fromLang("css");  // TODO
     }
 }

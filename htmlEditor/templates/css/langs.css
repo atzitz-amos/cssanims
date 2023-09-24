@@ -7,7 +7,7 @@
     color: #e0f3af;
 }
 
-[data-language="css"] .hl-number {
+[data-language="css"] .hl-dimension, [data-language="css"] .hl-number {
     color: #6897bb;
 }
 
@@ -32,5 +32,9 @@
 }
 
 [data-language="css"] .hl-function-name {
-    color: #663fa3;
+    color: #9873d1;
+}
+
+[data-language="css"] .hl-color {
+    color: #77d593;
 }

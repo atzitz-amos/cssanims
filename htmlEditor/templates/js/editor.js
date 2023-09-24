@@ -12,7 +12,7 @@ eventDispatcher.scope("window", {
         var body = document.body;
         body.style.setProperty("--component-editor-abs-height", "40vh");
         body.style.setProperty("--component-editor-abs-width", "94vw");
-        body.style.setProperty("--component-editor-layer-abs-height", "20px");
+        body.style.setProperty("--component-editor-layer-abs-height", "100%"); // TODO
 
         body.style.setProperty("--component-line-abs-height", "20px");
         var t = document.querySelector(".tab-editor")
@@ -185,7 +185,7 @@ function switchAttr(el, attr) {el.hasAttribute(attr) ? el.removeAttribute(attr) 
 
 // END UTILS
 
-window.onload = () => {
+window.addEventListener("load2", () => { // TODO
     document.getElementsByClassName("tree-open")[0].addEventListener(
         "click",
         (e) => {switchAttr(document.getElementsByClassName("tree")[0], "hidden");}
@@ -240,7 +240,7 @@ window.onload = () => {
     document.querySelector(".tab-editor").addEventListener("mousemove", e => {eventDispatcher.dispatch("mouse/move", e)});  // pointer
 
     document.querySelector(".tab-editor").addEventListener("mousewheel", e => {eventDispatcher.dispatch("mouse/wheel", e)});  // pointer
-};
+}, false);
 
 
 class Line {
@@ -670,7 +670,11 @@ scroll = {
     height: 20,
     onLineCountChange: function (count) {
         this.height = count * 20;
-        document.body.style.setProperty('--component-editor-layer-abs-height', this.height+"px");
+
+        var e = document.querySelector(".tab-editor");
+        document.body.style.setProperty('--component-editor-layer-abs-height',
+            this.height < e.clientHeight ? e.clientHeight + "px" : this.height+"px"
+        );
     },
     onLineChange: function (last, new_) {
         var start = parseInt(-this.amount / 20);

@@ -14,5 +14,7 @@ async function highlight (line) {
 
 eventDispatcher.listen("writer/change", function (line) {
     if (line == undefined) return;
+    eventDispatcher.dispatch("highlight/start", line);
     highlight(line);
+    eventDispatcher.dispatch("highlight/done", line);
 });

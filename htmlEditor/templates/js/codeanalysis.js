@@ -36,7 +36,6 @@ class Code {
 function handleSpan (span, line) {
 
     var [start, end, label, opts] = span;
-    console.log(start, end, label, opts)
     if (label == Bracket.OPEN) {
         Code.current().open_brackets.push(new Bracket(end == -1 ? line.text().substring(start) : line.text().substring(start, end), start, line, Bracket.OPEN))
     }
