@@ -1,0 +1,26 @@
+
+@font-face {
+  font-family: JetBrains;
+  src: url("../JetBrainsMono-Light.ttf");
+}
+
+.editor-root * {
+    font-family: 'JetBrains';
+    font-size: 16px;
+    letter-spacing: 1px;
+    white-space: pre;
+    tab-size: 4;
+    user-select: none;
+}
+.editor-root div {display: flex;}
+
+.editor-root {
+    height: var(--root-h);
+    width: var(--root-w);
+    background: var(--root-bg);
+
+}
+
+.editor-root.dark {
+    --root-bg: #434343;
+}
