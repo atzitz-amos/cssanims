@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor</title>
+    <link rel="stylesheet" href="css/editor.css">
+    <script src="js/editor.js"></script>
+</head>
+<body>
+    <span class="sizer" style="opacity: 0; position: relative; left: -20000000px; width: min-content; height: 0;"></span>
+    <div class="content">
+        <div class="editor">
+            <div class="tree" hidden>
+                <div class="tree-node tree-root">
+                    <div class="tree-node-title">Project</div>
+                    <div class="tree-node-content">
+                        <div class="tree-node"><div class="tree-node-title">Dir1</div><div class="tree-node-content"><div class="tree-file">File2</div></div></div>
+                        <div class="tree-file" data-path="dir1/file1.html" data-language="html">File1</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-open" role="button">Files</div>
+            <div class="filescontent">
+                <div class="tab">
+                    <div class="tabmanager">
+                        <div class="tabheader" data-linkedto="tab-0" data-language="css" selected>file1.css</div>
+                        <div class="tabheader" data-linkedto="tab-1" data-language="css">file2.css</div>
+                    </div>
+                    <div class="tabcontent" data-language="css">
+                        <div class="editor-gutter"><div class="tab-line"><div class="tab-line-number">1</div></div></div>
+                        <div class="tab-editor">
+                            <div class="editor-layer editor-inner">
+                                <div class="line" id="line-1"></div>
+                            </div>
+                            <div class="editor-layer editor-active-line">
+                                <div class="active-line line"></div>
+                            </div>
+                            <div class="editor-layer editor-cursors">
+                                <div class="tab-editor-cursor"></div>
+                                <input class="editor-input" style="position: absolute;">
+                            </div>
+                            <div class="editor-layer editor-selection">
+                                <div class="selection selection-start"></div>
+                                <div class="selection selection-middle"></div>
+                                <div class="selection selection-end"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="editor-modals">
+                        <div class="editor-modal modal-color-preview"></div>
+                        <div class="editor-modal modal-color-picker"></div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="preview" style="background:white"></div>
+    </div>
+</body>
+</html>

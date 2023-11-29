@@ -185,7 +185,7 @@ function switchAttr(el, attr) {el.hasAttribute(attr) ? el.removeAttribute(attr) 
 
 // END UTILS
 
-window.addEventListener("load2", () => { // TODO
+window.addEventListener("load", () => { // TODO
     document.getElementsByClassName("tree-open")[0].addEventListener(
         "click",
         (e) => {switchAttr(document.getElementsByClassName("tree")[0], "hidden");}

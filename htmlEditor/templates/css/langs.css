@@ -3,6 +3,10 @@
     color: #4c8f9e;
 }
 
+[data-language="css"] .hl-all-selector {
+    color: #fff531;
+}
+
 [data-language="css"] .hl-opening-bracket, [data-language="css"] .hl-closing-bracket {
     color: #e0f3af;
 }
@@ -20,7 +24,7 @@
 }
 
 [data-language="css"] .hl-property-name {
-    color: #c5c04f;
+    color: #d0c04f;
 }
 
 [data-language="css"] .hl-variable-definition {
@@ -37,4 +41,12 @@
 
 [data-language="css"] .hl-color {
     color: #77d593;
+}
+
+[data-language="css"] .hl-pseudo-class {
+    color: #77d57c;
+}
+
+[data-language="css"] .hl-pseudo-element {
+    color: #f4b94f;
 }

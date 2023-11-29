@@ -551,8 +551,9 @@ class Language {
                         for (var lit of current.content) {
                             if (tokens.startsWith(lit)) {
                                 noMatch = false;
+                                tokens.cursor += lit.length-1;
                                 tokens.checkpoint();
-                                tokens.cursor += lit.length;
+                                tokens.cursor += 1;
                                 current = current.children[0];
                                 break;
                             }

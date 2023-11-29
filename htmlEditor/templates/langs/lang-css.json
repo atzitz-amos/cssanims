@@ -1,12 +1,52 @@
 {
   "definitions": [
     {
+      "definition": "selector-instance[pseudo-class] [pseudo-element] [ selector-sep selector-instance]+",
+      "name": "selector"
+    },
+    {
+      "definition": "':'selector-name",
+      "name": "pseudo-class"
+    },
+    {
+      "definition": "'::'selector-name",
+      "name": "pseudo-element"
+    },
+    {
+      "definition": "class-selector | id-selector | all-selector | attr-selector",
+      "name": "selector-instance"
+    },
+    {
+      "list":  [" ", "+", "~", ">", ",", ""],
+      "name": "selector-sep"
+    },
+    {
       "definition": "'.'selector-name",
       "name": "class-selector"
     },
     {
       "definition": "'#'selector-name",
       "name": "id-selector"
+    },
+    {
+      "list": ["*"],
+      "name": "all-selector"
+    },
+    {
+      "definition": "'[' attr-name [attr-op attr-value] ']'",
+      "name": "attr-selector"
+    },
+    {
+      "definition": "selector-name",
+      "name": "attr-name"
+    },
+    {
+      "list": ["="],
+      "name": "attr-op"
+    },
+    {
+      "definition":  "value",
+      "name": "attr-value"
     },
     {
       "regex": "[a-zA-Z][a-zA-Z0-9_\\-]*",
